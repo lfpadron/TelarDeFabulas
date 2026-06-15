@@ -61,7 +61,16 @@ def character_create(request, project_pk):
 def character_detail(request, project_pk, character_pk):
     project = get_user_project(request.user, project_pk)
     character = get_project_character(project, character_pk)
-    return render(request, "characters/character_detail.html", {"project": project, "character": character})
+    linked_notes = character.work_notes.select_related("node").order_by("-updated_at", "title")
+    return render(
+        request,
+        "characters/character_detail.html",
+        {
+            "project": project,
+            "character": character,
+            "linked_notes": linked_notes,
+        },
+    )
 
 
 @login_required

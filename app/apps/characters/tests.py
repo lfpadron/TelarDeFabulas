@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.manuscripts.models import ManuscriptNode
+from apps.notes.models import Note
 from apps.projects.models import Project
 
 from .models import Character, CharacterDramaticRole, CharacterMention
@@ -210,3 +211,23 @@ class CharacterTests(TestCase):
         self.assertEqual(str(character), "Ariadna")
         self.assertIn("Ariadna", str(role))
         self.assertIn("Escena", str(mention))
+
+    def test_character_detail_shows_linked_work_notes(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        linked_note = Note.objects.create(
+            project=self.project,
+            character=character,
+            title="Nota visible desde personaje",
+            note_type=Note.NoteType.IDEA,
+            priority=Note.Priority.HIGH,
+        )
+        Note.objects.create(project=self.project, title="Nota sin personaje")
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.detail_url(character))
+
+        self.assertContains(response, "Notas, ideas y pendientes asociados")
+        self.assertContains(response, linked_note.title)
+        self.assertContains(response, linked_note.get_note_type_display())
+        self.assertContains(response, linked_note.get_priority_display())
+        self.assertNotContains(response, "Nota sin personaje")

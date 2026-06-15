@@ -52,9 +52,41 @@
     <p><strong>{% trans "Virtudes" %}:</strong><br>{{ character.virtues|default:"-"|linebreaksbr }}</p>
     <p><strong>{% trans "Defectos" %}:</strong><br>{{ character.flaws|default:"-"|linebreaksbr }}</p>
     <p><strong>{% trans "Arco del personaje" %}:</strong><br>{{ character.character_arc|default:"-"|linebreaksbr }}</p>
-    <p><strong>{% trans "Notas" %}:</strong><br>{{ character.notes|default:"-"|linebreaksbr }}</p>
+    <p><strong>{% trans "Notas de ficha" %}:</strong><br>{{ character.notes|default:"-"|linebreaksbr }}</p>
     <p><strong>{% trans "Creado" %}:</strong> {{ character.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>{% trans "Actualizado" %}:</strong> {{ character.updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+
+    <h2>{% trans "Notas, ideas y pendientes asociados" %}</h2>
+    {% if linked_notes %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Tipo" %}</th>
+                        <th>{% trans "Título" %}</th>
+                        <th>{% trans "Estado" %}</th>
+                        <th>{% trans "Prioridad" %}</th>
+                        <th>{% trans "Nodo" %}</th>
+                        <th>{% trans "Actualizada" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for note in linked_notes %}
+                        <tr>
+                            <td>{{ note.get_note_type_display }}</td>
+                            <td><a href="{% url 'notes:detail' project.pk note.pk %}">{{ note.title }}</a></td>
+                            <td>{{ note.get_status_display }}</td>
+                            <td>{{ note.get_priority_display }}</td>
+                            <td>{% if note.node %}{{ note.node.title }}{% else %}-{% endif %}</td>
+                            <td>{{ note.updated_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay notas, ideas o pendientes asociados a este personaje." %}</p>
+    {% endif %}
 
     <div class="actions">
         <a class="button secondary" href="{% url 'characters:list' project.pk %}">{% trans "Volver a personajes" %}</a>
