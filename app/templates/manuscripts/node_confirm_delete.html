@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Borrar nodo" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Borrar nodo" %}</h1>
+    <p class="warning-note">
+        {% blocktrans with title=node.title %}
+            Vas a borrar físicamente el nodo "{{ title }}". Esta acción no borra proyectos ni otros nodos.
+        {% endblocktrans %}
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <button class="button warning" type="submit">{% trans "Sí, borrar nodo" %}</button>
+        <a class="button secondary" href="{% url 'manuscripts:detail' project.pk node.pk %}">{% trans "Cancelar" %}</a>
+    </form>
+</section>
+{% endblock %}

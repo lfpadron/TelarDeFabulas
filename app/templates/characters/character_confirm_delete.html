@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Borrar personaje" %} | {{ character.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Borrar personaje" %}</h1>
+    <p>
+        {% blocktrans with name=character.name %}
+            ¿Seguro que quieres borrar el personaje "{{ name }}"?
+        {% endblocktrans %}
+    </p>
+    <p class="warning-note">{% trans "Este borrado es físico para el personaje. No borra el proyecto ni nodos de manuscrito." %}</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <button class="button warning" type="submit">{% trans "Borrar personaje" %}</button>
+        <a class="button secondary" href="{% url 'characters:detail' project.pk character.pk %}">{% trans "Cancelar" %}</a>
+    </form>
+</section>
+{% endblock %}

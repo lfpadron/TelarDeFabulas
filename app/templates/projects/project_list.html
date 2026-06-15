@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Proyectos" %} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Proyectos" %}</h1>
+    <p>
+        <a class="button" href="{% url 'projects:create' %}">{% trans "Crear proyecto" %}</a>
+    </p>
+
+    {% if projects %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Nombre" %}</th>
+                        <th>{% trans "Idioma/locale" %}</th>
+                        <th>{% trans "Estado" %}</th>
+                        <th>{% trans "Fecha de creación" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                        <tr>
+                            <td>{{ project.name }}</td>
+                            <td>{{ project.get_language_display }} / {{ project.get_locale_display }}</td>
+                            <td>{{ project.get_status_display }}</td>
+                            <td>{{ project.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                            <td>
+                                <div class="actions">
+                                    <a href="{% url 'projects:detail' project.pk %}">{% trans "ver" %}</a>
+                                    {% if project.status != "DELETED" %}
+                                        <a href="{% url 'projects:edit' project.pk %}">{% trans "editar" %}</a>
+                                    {% endif %}
+                                    {% if project.status == "ACTIVE" or project.status == "FROZEN" %}
+                                        <a href="{% url 'projects:delete' project.pk %}">{% trans "marcar para borrar" %}</a>
+                                    {% endif %}
+                                    {% if project.status == "FROZEN" or project.status == "PENDING_DELETION" %}
+                                        <form class="inline-form" method="post" action="{% url 'projects:restore' project.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit">{% trans "restaurar" %}</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no tienes proyectos." %}</p>
+    {% endif %}
+</section>
+{% endblock %}

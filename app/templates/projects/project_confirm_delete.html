@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Marcar proyecto para borrar" %} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Marcar proyecto para borrar" %}</h1>
+    <p class="warning-note">
+        {% blocktrans with name=project.name %}
+            Vas a marcar "{{ name }}" como pendiente de borrado. No se eliminará físicamente todavía.
+        {% endblocktrans %}
+    </p>
+    <p>
+        {% trans "El proyecto se conservará durante 90 días antes del borrado real. Podrás restaurarlo durante ese periodo." %}
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <button class="button warning" type="submit">{% trans "Sí, marcar para borrar" %}</button>
+        <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Cancelar" %}</a>
+    </form>
+</section>
+{% endblock %}

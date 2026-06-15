@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{{ title }}</h1>
+    <p class="muted">{% trans "Proyecto" %}: {{ project.name }}</p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button" type="submit">{{ submit_label }}</button>
+        <a class="button secondary" href="{% url 'characters:list' project.pk %}">{% trans "Volver a personajes" %}</a>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Inicio" %} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Telar de Fábulas está vivo." %}</h1>
+    {% if user.is_authenticated %}
+        <p>{% blocktrans with name=user.public_name %}Hola, {{ name }}.{% endblocktrans %}</p>
+    {% endif %}
+</section>
+{% endblock %}

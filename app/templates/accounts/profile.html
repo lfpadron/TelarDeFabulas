@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Perfil" %} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Perfil" %}</h1>
+    <p>{% trans "Email" %}: {{ user.email }}</p>
+    <p>{% trans "Tipo de usuario" %}: {{ user.get_user_type_display }}</p>
+    <p>{% trans "Estado" %}: {{ user.get_status_display }}</p>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button" type="submit">{% trans "Guardar perfil" %}</button>
+    </form>
+</section>
+{% endblock %}

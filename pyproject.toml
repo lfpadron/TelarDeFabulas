@@ -1,0 +1,22 @@
+[project]
+name = "telar-fabulas"
+version = "0.1.0"
+description = "Telar de Fabulas: la fragua digital del novelista."
+requires-python = ">=3.12"
+dependencies = [
+    "Django>=5.2,<5.3",
+    "psycopg[binary]>=3.2,<4.0",
+    "celery[redis]>=5.4,<6.0",
+    "gunicorn>=23.0,<24.0",
+]
+
+[dependency-groups]
+dev = [
+    "textual>=0.89,<7.0",
+]
+tui = [
+    "textual>=0.89,<7.0",
+]
+
+[tool.uv]
+package = false

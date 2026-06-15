@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Manuscrito" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Manuscrito" %}: {{ project.name }}</h1>
+
+    {% if project.status == "PENDING_DELETION" or project.status == "DELETED" %}
+        <p class="warning-note">
+            {% trans "Este proyecto no permite crear o editar nodos de manuscrito por su estado actual." %}
+        </p>
+    {% endif %}
+
+    <div class="actions">
+        <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+            <a class="button" href="{% url 'manuscripts:create' project.pk %}">{% trans "Crear nodo" %}</a>
+        {% endif %}
+    </div>
+
+    {% if tree_rows %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Título" %}</th>
+                        <th>{% trans "Tipo" %}</th>
+                        <th>{% trans "Estado" %}</th>
+                        <th>{% trans "Palabras" %}</th>
+                        <th>{% trans "Publicable" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in tree_rows %}
+                        <tr>
+                            <td>
+                                <span style="display:inline-block; margin-left: {{ row.indent }}px;">
+                                    {{ row.node.title }}
+                                </span>
+                            </td>
+                            <td>{{ row.node.get_node_type_display }}</td>
+                            <td>{{ row.node.get_status_display }}</td>
+                            <td>{{ row.node.word_count }}</td>
+                            <td>
+                                {% if row.node.is_publishable %}
+                                    {% trans "Sí" %}
+                                {% else %}
+                                    {% trans "No" %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <a href="{% url 'manuscripts:detail' project.pk row.node.pk %}">{% trans "ver" %}</a>
+                                    {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+                                        <a href="{% url 'manuscripts:edit' project.pk row.node.pk %}">{% trans "editar" %}</a>
+                                        <a href="{% url 'manuscripts:delete' project.pk row.node.pk %}">{% trans "borrar" %}</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay nodos de manuscrito para este proyecto." %}</p>
+    {% endif %}
+</section>
+{% endblock %}

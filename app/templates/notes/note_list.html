@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Notas, ideas y pendientes" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Notas, ideas y pendientes" %}: {{ project.name }}</h1>
+
+    {% if project.status == "PENDING_DELETION" or project.status == "DELETED" %}
+        <p class="warning-note">
+            {% trans "Este proyecto no permite crear o editar notas por su estado actual." %}
+        </p>
+    {% endif %}
+
+    <div class="actions">
+        <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+            <a class="button" href="{% url 'notes:create' project.pk %}">{% trans "Crear nota" %}</a>
+        {% endif %}
+    </div>
+
+    <form method="get">
+        <p>
+            <label for="id_type">{% trans "Tipo" %}</label>
+            <select id="id_type" name="type">
+                <option value="">{% trans "Todos" %}</option>
+                {% for value, label in note_type_choices %}
+                    <option value="{{ value }}" {% if current_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>
+            <label for="id_status">{% trans "Estado" %}</label>
+            <select id="id_status" name="status">
+                <option value="">{% trans "Todos" %}</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>
+            <label for="id_priority">{% trans "Prioridad" %}</label>
+            <select id="id_priority" name="priority">
+                <option value="">{% trans "Todas" %}</option>
+                {% for value, label in priority_choices %}
+                    <option value="{{ value }}" {% if current_priority == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </p>
+        <div class="actions">
+            <button class="button" type="submit">{% trans "Filtrar" %}</button>
+            <a class="button secondary" href="{% url 'notes:list' project.pk %}">{% trans "Limpiar filtros" %}</a>
+        </div>
+    </form>
+
+    {% if notes %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Tipo" %}</th>
+                        <th>{% trans "Título" %}</th>
+                        <th>{% trans "Estado" %}</th>
+                        <th>{% trans "Prioridad" %}</th>
+                        <th>{% trans "Nodo" %}</th>
+                        <th>{% trans "Personaje" %}</th>
+                        <th>{% trans "Actualizada" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for note in notes %}
+                        <tr>
+                            <td>{{ note.get_note_type_display }}</td>
+                            <td>{{ note.title }}</td>
+                            <td>{{ note.get_status_display }}</td>
+                            <td>{{ note.get_priority_display }}</td>
+                            <td>{% if note.node %}{{ note.node.title }}{% else %}-{% endif %}</td>
+                            <td>{% if note.character %}{{ note.character.name }}{% else %}-{% endif %}</td>
+                            <td>{{ note.updated_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                            <td>
+                                <div class="actions">
+                                    <a href="{% url 'notes:detail' project.pk note.pk %}">{% trans "ver" %}</a>
+                                    {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+                                        <a href="{% url 'notes:edit' project.pk note.pk %}">{% trans "editar" %}</a>
+                                        <a href="{% url 'notes:delete' project.pk note.pk %}">{% trans "borrar" %}</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay notas, ideas o pendientes para este proyecto." %}</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Borrar nota" %} | {{ note.title }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Borrar nota" %}</h1>
+    <p>
+        {% blocktrans with title=note.title %}
+            ¿Seguro que quieres borrar la nota "{{ title }}"?
+        {% endblocktrans %}
+    </p>
+    <p class="warning-note">{% trans "Este borrado es físico para la nota. No borra el proyecto, nodo o personaje relacionado." %}</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <button class="button warning" type="submit">{% trans "Borrar nota" %}</button>
+        <a class="button secondary" href="{% url 'notes:detail' project.pk note.pk %}">{% trans "Cancelar" %}</a>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Personajes" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Personajes" %}: {{ project.name }}</h1>
+
+    {% if project.status == "PENDING_DELETION" or project.status == "DELETED" %}
+        <p class="warning-note">
+            {% trans "Este proyecto no permite crear o editar personajes por su estado actual." %}
+        </p>
+    {% endif %}
+
+    <div class="actions">
+        <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+            <a class="button" href="{% url 'characters:create' project.pk %}">{% trans "Crear personaje" %}</a>
+        {% endif %}
+    </div>
+
+    {% if characters %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Nombre" %}</th>
+                        <th>{% trans "Alias" %}</th>
+                        <th>{% trans "Importancia" %}</th>
+                        <th>{% trans "Rol narrativo" %}</th>
+                        <th>{% trans "Estado" %}</th>
+                        <th>{% trans "Completitud" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for character in characters %}
+                        <tr>
+                            <td>{{ character.name }}</td>
+                            <td>{{ character.alias|default:"-" }}</td>
+                            <td>{{ character.get_importance_display }}</td>
+                            <td>
+                                {% if character.narrative_role == "OTRO" and character.custom_narrative_role %}
+                                    {{ character.custom_narrative_role }}
+                                {% else %}
+                                    {{ character.get_narrative_role_display }}
+                                {% endif %}
+                            </td>
+                            <td>{{ character.get_completion_status_display }}</td>
+                            <td>{{ character.completion_percentage }}%</td>
+                            <td>
+                                <div class="actions">
+                                    <a href="{% url 'characters:detail' project.pk character.pk %}">{% trans "ver" %}</a>
+                                    {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+                                        <a href="{% url 'characters:edit' project.pk character.pk %}">{% trans "editar" %}</a>
+                                        <a href="{% url 'characters:delete' project.pk character.pk %}">{% trans "borrar" %}</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay personajes para este proyecto." %}</p>
+    {% endif %}
+</section>
+{% endblock %}
