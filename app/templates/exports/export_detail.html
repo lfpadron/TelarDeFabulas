@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Exportación" %} #{{ export_job.id }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Exportación" %} #{{ export_job.id }}</h1>
+
+    <p><strong>{% trans "Estado" %}:</strong> {{ export_job.get_status_display }}</p>
+    <p><strong>{% trans "Formato" %}:</strong> {{ export_job.get_format_display }}</p>
+    <p><strong>{% trans "Proyecto" %}:</strong> {{ export_job.project }}</p>
+    <p><strong>{% trans "Nodo raíz" %}:</strong> {{ export_job.root_node|default:"-" }}</p>
+    <p><strong>{% trans "Estilo" %}:</strong> {{ export_job.style_template }}</p>
+    <p><strong>{% trans "Creada" %}:</strong> {{ export_job.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>{% trans "Iniciada" %}:</strong> {{ export_job.started_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</p>
+    <p><strong>{% trans "Finalizada" %}:</strong> {{ export_job.finished_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</p>
+
+    {% if export_job.error_message %}
+        <h2>{% trans "Error" %}</h2>
+        <p class="warning-note">{{ export_job.error_message }}</p>
+    {% endif %}
+
+    <div class="actions">
+        <a class="button secondary" href="{% url 'exports:list' project.pk %}">{% trans "Volver a exportaciones" %}</a>
+        {% if export_job.status == "DONE" and export_job.file %}
+            <a class="button" href="{% url 'exports:download' project.pk export_job.pk %}">{% trans "Descargar archivo" %}</a>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

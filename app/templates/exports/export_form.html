@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Nueva exportación" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Nueva exportación" %}: {{ project.name }}</h1>
+
+    <p class="muted">{% trans "En esta fase se genera HTML y DOCX. PDF y EPUB quedan preparados para fases posteriores." %}</p>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button" type="submit">{% trans "Crear exportación" %}</button>
+        <a class="button secondary" href="{% url 'exports:list' project.pk %}">{% trans "Volver a exportaciones" %}</a>
+    </form>
+</section>
+{% endblock %}

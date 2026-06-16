@@ -17,6 +17,7 @@ urlpatterns = [
     path("", include("apps.characters.urls")),
     path("", include("apps.notes.urls")),
     path("", include("apps.styles.urls")),
+    path("", include("apps.exports.urls")),
     path("admin/", admin.site.urls),
 ]
 

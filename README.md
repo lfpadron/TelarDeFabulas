@@ -14,6 +14,7 @@ Base tecnica inicial de un SaaS Django con PostgreSQL, Redis, Celery, Celery Bea
 - Celery Beat
 - Gunicorn
 - uv
+- python-docx
 - Podman Compose / Docker Compose
 
 ## Requisitos
@@ -426,6 +427,63 @@ podman compose exec web python manage.py test apps.accounts apps.projects apps.m
 podman compose exec web python manage.py makemigrations --check --dry-run
 ```
 
+## Exportaciones
+
+La app `exports` gestiona solicitudes de exportación mediante `ExportJob`. Cada trabajo pertenece a un usuario y proyecto, puede exportar todo el manuscrito o un subárbol desde un nodo raíz, y usa una plantilla de `styles`.
+
+Rutas disponibles:
+
+```text
+http://localhost:8000/projects/<project_id>/exports/
+http://localhost:8000/projects/<project_id>/exports/create/
+http://localhost:8000/projects/<project_id>/exports/<export_id>/
+```
+
+Estados de `ExportJob`:
+
+- `PENDING`: solicitud creada y encolada.
+- `PROCESSING`: worker Celery generando el archivo.
+- `DONE`: archivo generado y listo para descarga.
+- `FAILED`: hubo error; el detalle muestra `error_message`.
+
+Formatos v01:
+
+- `HTML`: implementado y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.html`.
+- La descarga se sirve desde Django como adjunto para bajar un único `.html` con CSS incrustado.
+- `DOCX`: implementado con `python-docx` y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.docx`.
+- `PDF` y `EPUB`: quedan preparados en el modelo para fases futuras, pero no se ofrecen en la UI.
+
+Reglas principales:
+
+- Un usuario solo puede exportar sus propios proyectos.
+- No se exportan proyectos `DELETED` ni `PENDING_DELETION`.
+- Si se elige nodo raíz, se exporta ese nodo y sus descendientes.
+- Si no se elige nodo raíz, se exportan todos los nodos raíz del proyecto y sus descendientes.
+- HTML y DOCX solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
+- Usuarios `FREE` pueden usar estilos del sistema.
+- Usuarios `PREMIUM` pueden usar estilos del sistema y estilos propios.
+
+Limitaciones actuales:
+
+- PDF pendiente.
+- EPUB pendiente.
+- El índice DOCX es una lista simple; el índice dinámico de Word queda pendiente.
+- La numeración de páginas DOCX queda pendiente.
+
+Verificar el worker Celery:
+
+```powershell
+podman compose exec worker celery -A config inspect ping
+```
+
+Pruebas de exportaciones:
+
+```powershell
+podman compose exec web python manage.py test apps.exports
+podman compose exec web python manage.py test apps.accounts apps.projects apps.manuscripts apps.characters apps.notes apps.styles apps.exports
+podman compose exec web python manage.py makemigrations --check --dry-run
+```
+
 ## Verificar Celery
 
 Revisa que el worker responda:
@@ -489,9 +547,9 @@ Nginx queda pendiente para la configuracion de produccion.
 
 ## Siguiente fase sugerida
 
-1. Implementar `exports` como cola inicial de exportaciones con Celery.
+1. Agregar vista previa simple de HTML exportado antes de descargar.
 2. Agregar interfaz completa para menciones de personajes por escena.
 3. Preparar reordenamiento de nodos del árbol narrativo.
-4. Incorporar tareas reales de exportacion con Celery.
+4. Implementar exportación PDF.
 5. Diseñar tablero futuro para pendientes sin implementarlo aún.
 # TelarDeFabulas

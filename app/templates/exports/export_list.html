@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Exportaciones" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Exportaciones" %}: {{ project.name }}</h1>
+
+    <div class="actions">
+        <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        {% if can_create_export %}
+            <a class="button" href="{% url 'exports:create' project.pk %}">{% trans "Nueva exportación" %}</a>
+        {% else %}
+            <p class="warning-note">{% trans "Este proyecto no permite nuevas exportaciones por su estado actual." %}</p>
+        {% endif %}
+    </div>
+
+    {% if export_jobs %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Formato" %}</th>
+                        <th>{% trans "Estado" %}</th>
+                        <th>{% trans "Nodo raíz" %}</th>
+                        <th>{% trans "Estilo" %}</th>
+                        <th>{% trans "Creada" %}</th>
+                        <th>{% trans "Finalizada" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for export_job in export_jobs %}
+                        <tr>
+                            <td>{{ export_job.get_format_display }}</td>
+                            <td>{{ export_job.get_status_display }}</td>
+                            <td>{{ export_job.root_node|default:"-" }}</td>
+                            <td>{{ export_job.style_template }}</td>
+                            <td>{{ export_job.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                            <td>{{ export_job.finished_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</td>
+                            <td>
+                                <div class="actions">
+                                    <a href="{% url 'exports:detail' project.pk export_job.pk %}">{% trans "ver" %}</a>
+                                    {% if export_job.status == "DONE" and export_job.file %}
+                                        <a href="{% url 'exports:download' project.pk export_job.pk %}">{% trans "descargar" %}</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay exportaciones para este proyecto." %}</p>
+    {% endif %}
+</section>
+{% endblock %}
