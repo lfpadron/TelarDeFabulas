@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Borrar estilo" %} | {{ style.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Borrar estilo" %}</h1>
+    <p>
+        {% blocktrans with name=style.name %}
+            ¿Seguro que quieres borrar el estilo "{{ name }}"?
+        {% endblocktrans %}
+    </p>
+    <p class="warning-note">{% trans "Este borrado es físico para el estilo personalizado." %}</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <button class="button warning" type="submit">{% trans "Borrar estilo" %}</button>
+        <a class="button secondary" href="{% url 'styles:detail' style.pk %}">{% trans "Cancelar" %}</a>
+    </form>
+</section>
+{% endblock %}

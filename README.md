@@ -376,6 +376,56 @@ podman compose exec web python manage.py test apps.accounts apps.projects apps.m
 podman compose exec web python manage.py makemigrations --check --dry-run
 ```
 
+## Estilos de exportacion
+
+La app `styles` gestiona plantillas de estilo que seran usadas por futuras exportaciones a HTML, DOCX, PDF y EPUB. En esta fase no hay exportacion real; solo se guardan las configuraciones de presentacion.
+
+Rutas disponibles:
+
+```text
+http://localhost:8000/styles/
+http://localhost:8000/styles/create/
+http://localhost:8000/styles/<style_id>/
+http://localhost:8000/styles/<style_id>/edit/
+http://localhost:8000/styles/<style_id>/duplicate/
+http://localhost:8000/styles/<style_id>/delete/
+```
+
+Sembrar o actualizar los estilos del sistema:
+
+```powershell
+podman compose exec web python manage.py seed_system_styles
+```
+
+El comando es idempotente y deja disponibles cuatro estilos base:
+
+- Sobrio.
+- Creativo.
+- Elegante.
+- Medio loco.
+
+Reglas v01:
+
+- Usuarios `FREE`: pueden ver y usar estilos del sistema, pero no crear, editar, duplicar ni borrar estilos.
+- Usuarios `PREMIUM`: pueden crear estilos personalizados, editar los propios, duplicar estilos del sistema o propios, y borrar sus estilos.
+- `BUSINESS_ADMIN` y `TECH_ADMIN`: pueden gestionar estilos del sistema desde Django admin.
+
+Si necesitas convertir un usuario de pruebas a premium, entra a:
+
+```text
+http://localhost:8000/admin/accounts/user/
+```
+
+y cambia el campo `user_type` a `PREMIUM`.
+
+Pruebas de estilos:
+
+```powershell
+podman compose exec web python manage.py test apps.styles
+podman compose exec web python manage.py test apps.accounts apps.projects apps.manuscripts apps.characters apps.notes apps.styles
+podman compose exec web python manage.py makemigrations --check --dry-run
+```
+
 ## Verificar Celery
 
 Revisa que el worker responda:
@@ -439,7 +489,7 @@ Nginx queda pendiente para la configuracion de produccion.
 
 ## Siguiente fase sugerida
 
-1. Implementar `styles` para guías de estilo, tono y voz narrativa.
+1. Implementar `exports` como cola inicial de exportaciones con Celery.
 2. Agregar interfaz completa para menciones de personajes por escena.
 3. Preparar reordenamiento de nodos del árbol narrativo.
 4. Incorporar tareas reales de exportacion con Celery.

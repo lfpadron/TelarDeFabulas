@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Estilos" %} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Estilos de exportación" %}</h1>
+
+    <div class="actions">
+        {% if can_manage_styles %}
+            <a class="button" href="{% url 'styles:create' %}">{% trans "Crear estilo" %}</a>
+        {% else %}
+            <p class="muted">{% trans "Tu cuenta puede usar estilos del sistema. Los estilos personalizados son para cuentas premium." %}</p>
+        {% endif %}
+    </div>
+
+    {% if styles %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Nombre" %}</th>
+                        <th>{% trans "Tipo" %}</th>
+                        <th>{% trans "Categoría" %}</th>
+                        <th>{% trans "Fuente títulos" %}</th>
+                        <th>{% trans "Fuente cuerpo" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for style in styles %}
+                        <tr>
+                            <td>{{ style.name }}</td>
+                            <td>{% if style.is_system %}{% trans "Sistema" %}{% else %}{% trans "Personal" %}{% endif %}</td>
+                            <td>{{ style.get_font_category_display }}</td>
+                            <td>{{ style.font_heading }}</td>
+                            <td>{{ style.font_body }}</td>
+                            <td>
+                                <div class="actions">
+                                    <a href="{% url 'styles:detail' style.pk %}">{% trans "ver" %}</a>
+                                    {% if can_manage_styles %}
+                                        <form class="inline-form" method="post" action="{% url 'styles:duplicate' style.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit">{% trans "duplicar" %}</button>
+                                        </form>
+                                    {% endif %}
+                                    {% if not style.is_system and style.user_id == user.id %}
+                                        <a href="{% url 'styles:edit' style.pk %}">{% trans "editar" %}</a>
+                                        <a href="{% url 'styles:delete' style.pk %}">{% trans "borrar" %}</a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay estilos disponibles." %}</p>
+    {% endif %}
+</section>
+{% endblock %}

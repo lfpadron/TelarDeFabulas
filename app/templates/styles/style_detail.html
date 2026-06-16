@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ style.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{{ style.name }}</h1>
+    <p><strong>{% trans "Tipo" %}:</strong> {% if style.is_system %}{% trans "Sistema" %}{% else %}{% trans "Personal" %}{% endif %}</p>
+    {% if style.description %}
+        <p>{{ style.description|linebreaksbr }}</p>
+    {% endif %}
+
+    <h2>{% trans "Tipografía" %}</h2>
+    <p><strong>{% trans "Categoría" %}:</strong> {{ style.get_font_category_display }}</p>
+    <p><strong>{% trans "Fuente de títulos" %}:</strong> {{ style.font_heading }}</p>
+    <p><strong>{% trans "Fuente de cuerpo" %}:</strong> {{ style.font_body }}</p>
+    <p><strong>{% trans "Tamaño de títulos" %}:</strong> {{ style.heading_size }}</p>
+    <p><strong>{% trans "Tamaño de cuerpo" %}:</strong> {{ style.body_size }}</p>
+
+    <h2>{% trans "Composición" %}</h2>
+    <p><strong>{% trans "Interlineado" %}:</strong> {{ style.line_spacing }}</p>
+    <p><strong>{% trans "Espaciado entre párrafos" %}:</strong> {{ style.paragraph_spacing }}</p>
+    <p><strong>{% trans "Márgenes" %}:</strong> {{ style.margin_top }} / {{ style.margin_right }} / {{ style.margin_bottom }} / {{ style.margin_left }}</p>
+    <p><strong>{% trans "Alineación" %}:</strong> {{ style.get_text_alignment_display }}</p>
+    <p><strong>{% trans "Sangría de primera línea" %}:</strong> {{ style.first_line_indent }}</p>
+    <p><strong>{% trans "Separador de escena" %}:</strong> {{ style.scene_separator|default:"-" }}</p>
+    <p><strong>{% trans "Números de página" %}:</strong> {% if style.include_page_numbers %}{% trans "Sí" %}{% else %}{% trans "No" %}{% endif %}</p>
+    <p><strong>{% trans "Tabla de contenidos" %}:</strong> {% if style.include_table_of_contents %}{% trans "Sí" %}{% else %}{% trans "No" %}{% endif %}</p>
+
+    <h2>{% trans "Configuración JSON" %}</h2>
+    <pre>{{ style.config_json }}</pre>
+
+    <div class="actions">
+        <a class="button secondary" href="{% url 'styles:list' %}">{% trans "Volver a estilos" %}</a>
+        {% if can_edit_style %}
+            <a class="button" href="{% url 'styles:edit' style.pk %}">{% trans "Editar" %}</a>
+        {% endif %}
+        {% if can_duplicate_style %}
+            <form class="inline-form" method="post" action="{% url 'styles:duplicate' style.pk %}">
+                {% csrf_token %}
+                <button class="button" type="submit">{% trans "Duplicar" %}</button>
+            </form>
+        {% endif %}
+        {% if can_delete_style %}
+            <a class="button warning" href="{% url 'styles:delete' style.pk %}">{% trans "Borrar" %}</a>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
