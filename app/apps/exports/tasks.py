@@ -6,6 +6,7 @@ from config.celery import app
 
 from .docx import build_export_docx
 from .models import ExportJob
+from .pdf import build_export_pdf
 from .services import build_export_html
 
 
@@ -24,8 +25,11 @@ def generate_export_job(export_job_id):
         elif export_job.format == ExportJob.ExportFormat.DOCX:
             docx_content = build_export_docx(export_job)
             export_job.file.save(f"{export_job.pk}.docx", ContentFile(docx_content), save=False)
+        elif export_job.format == ExportJob.ExportFormat.PDF:
+            pdf_content = build_export_pdf(export_job)
+            export_job.file.save(f"{export_job.pk}.pdf", ContentFile(pdf_content), save=False)
         else:
-            raise NotImplementedError(_("Este formato todavía no está implementado."))
+            raise NotImplementedError(_("Formato todavía no implementado."))
 
         export_job.status = ExportJob.ExportStatus.DONE
         export_job.finished_at = timezone.now()

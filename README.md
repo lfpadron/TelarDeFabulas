@@ -15,6 +15,7 @@ Base tecnica inicial de un SaaS Django con PostgreSQL, Redis, Celery, Celery Bea
 - Gunicorn
 - uv
 - python-docx
+- WeasyPrint
 - Podman Compose / Docker Compose
 
 ## Requisitos
@@ -379,7 +380,7 @@ podman compose exec web python manage.py makemigrations --check --dry-run
 
 ## Estilos de exportacion
 
-La app `styles` gestiona plantillas de estilo que seran usadas por futuras exportaciones a HTML, DOCX, PDF y EPUB. En esta fase no hay exportacion real; solo se guardan las configuraciones de presentacion.
+La app `styles` gestiona plantillas de estilo usadas por las exportaciones a HTML, DOCX y PDF. EPUB queda preparado para una fase posterior.
 
 Rutas disponibles:
 
@@ -451,7 +452,8 @@ Formatos v01:
 - `HTML`: implementado y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.html`.
 - La descarga se sirve desde Django como adjunto para bajar un único `.html` con CSS incrustado.
 - `DOCX`: implementado con `python-docx` y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.docx`.
-- `PDF` y `EPUB`: quedan preparados en el modelo para fases futuras, pero no se ofrecen en la UI.
+- `PDF`: implementado con `WeasyPrint` reutilizando el HTML/CSS de exportación y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.pdf`.
+- `EPUB`: queda preparado en el modelo para una fase futura, pero no se ofrece en la UI.
 
 Reglas principales:
 
@@ -459,16 +461,17 @@ Reglas principales:
 - No se exportan proyectos `DELETED` ni `PENDING_DELETION`.
 - Si se elige nodo raíz, se exporta ese nodo y sus descendientes.
 - Si no se elige nodo raíz, se exportan todos los nodos raíz del proyecto y sus descendientes.
-- HTML y DOCX solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
+- HTML, DOCX y PDF solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
 - Usuarios `FREE` pueden usar estilos del sistema.
 - Usuarios `PREMIUM` pueden usar estilos del sistema y estilos propios.
 
 Limitaciones actuales:
 
-- PDF pendiente.
 - EPUB pendiente.
 - El índice DOCX es una lista simple; el índice dinámico de Word queda pendiente.
+- El índice PDF reutiliza el índice simple del HTML; índice avanzado pendiente.
 - La numeración de páginas DOCX queda pendiente.
+- Las fuentes del PDF usan las fuentes disponibles en el sistema; fuentes embebidas quedan pendientes.
 
 Verificar el worker Celery:
 
@@ -550,6 +553,6 @@ Nginx queda pendiente para la configuracion de produccion.
 1. Agregar vista previa simple de HTML exportado antes de descargar.
 2. Agregar interfaz completa para menciones de personajes por escena.
 3. Preparar reordenamiento de nodos del árbol narrativo.
-4. Implementar exportación PDF.
+4. Implementar exportación EPUB.
 5. Diseñar tablero futuro para pendientes sin implementarlo aún.
 # TelarDeFabulas

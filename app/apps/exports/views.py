@@ -32,11 +32,13 @@ def project_allows_exports(project):
 DOWNLOAD_CONTENT_TYPES = {
     ExportJob.ExportFormat.HTML: "text/html; charset=utf-8",
     ExportJob.ExportFormat.DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ExportJob.ExportFormat.PDF: "application/pdf",
 }
 
 DOWNLOAD_EXTENSIONS = {
     ExportJob.ExportFormat.HTML: "html",
     ExportJob.ExportFormat.DOCX: "docx",
+    ExportJob.ExportFormat.PDF: "pdf",
 }
 
 

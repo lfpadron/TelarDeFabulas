@@ -47,6 +47,7 @@ class ExportJobForm(forms.ModelForm):
         self.fields["format"].choices = (
             (ExportJob.ExportFormat.HTML, _("HTML")),
             (ExportJob.ExportFormat.DOCX, _("DOCX")),
+            (ExportJob.ExportFormat.PDF, _("PDF")),
         )
 
     def clean(self):

@@ -102,6 +102,16 @@ def build_export_html(export_job):
     lang = project.locale or "es-mx"
     text_alignment = style.text_alignment.lower().replace("_", "-")
     fallback_family = "serif" if style.font_category == style.FontCategory.SERIF else "sans-serif"
+    page_number_css = ""
+    if style.include_page_numbers:
+        page_number_css = f"""
+      @bottom-center {{
+        content: counter(page);
+        font-family: '{css_font_name(style.font_body)}', {fallback_family};
+        font-size: 9pt;
+        color: #666666;
+      }}
+"""
 
     toc = render_toc(nodes) if style.include_table_of_contents else ""
     body = "\n".join(render_node(node, style) for node in nodes)
@@ -112,6 +122,15 @@ def build_export_html(export_job):
   <meta charset="utf-8">
   <title>{escape(title)}</title>
   <style>
+    @page {{
+      margin: {css_number(style.margin_top)}mm {css_number(style.margin_right)}mm {css_number(style.margin_bottom)}mm {css_number(style.margin_left)}mm;
+      {page_number_css}
+    }}
+    @media print {{
+      body {{
+        margin: 0;
+      }}
+    }}
     body {{
       box-sizing: border-box;
       font-family: '{css_font_name(style.font_body)}', {fallback_family};

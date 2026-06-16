@@ -12,6 +12,18 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /uvx /bin/
 
 WORKDIR /code
 
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        fontconfig \
+        fonts-dejavu-core \
+        libglib2.0-0 \
+        libharfbuzz-subset0 \
+        libjpeg62-turbo \
+        libopenjp2-7 \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml uv.lock /code/
 RUN uv sync --locked --no-dev --no-install-project
 
