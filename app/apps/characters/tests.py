@@ -73,6 +73,31 @@ class CharacterTests(TestCase):
         project = project or self.project
         return reverse("characters:list", kwargs={"project_pk": project.pk})
 
+    def mention_create_url(self, project=None):
+        project = project or self.project
+        return reverse("characters:mention_create", kwargs={"project_pk": project.pk})
+
+    def mention_edit_url(self, mention, project=None):
+        project = project or mention.character.project
+        return reverse("characters:mention_edit", kwargs={"project_pk": project.pk, "mention_pk": mention.pk})
+
+    def mention_delete_url(self, mention, project=None):
+        project = project or mention.character.project
+        return reverse("characters:mention_delete", kwargs={"project_pk": project.pk, "mention_pk": mention.pk})
+
+    def node_detail_url(self, node, project=None):
+        project = project or node.project
+        return reverse("manuscripts:detail", kwargs={"project_pk": project.pk, "node_pk": node.pk})
+
+    def mention_payload(self, character, node, **overrides):
+        payload = {
+            "character": character.pk,
+            "node": node.pk,
+            "mention_type": CharacterMention.MentionType.APPEARS,
+        }
+        payload.update(overrides)
+        return payload
+
     def test_authenticated_user_can_create_character_in_own_project(self):
         self.client.force_login(self.user)
 
@@ -172,6 +197,236 @@ class CharacterTests(TestCase):
 
         with self.assertRaises(ValidationError):
             mention.full_clean()
+
+    def test_authenticated_user_can_create_mention_in_own_project(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
+
+        mention = CharacterMention.objects.get(character=character, node=node)
+        self.assertRedirects(response, self.detail_url(character))
+        self.assertEqual(mention.mention_type, CharacterMention.MentionType.APPEARS)
+
+    def test_unauthenticated_user_is_redirected_from_mention_create(self):
+        response = self.client.get(self.mention_create_url())
+
+        self.assertRedirects(response, f"{reverse('login')}?next={self.mention_create_url()}")
+
+    def test_user_cannot_create_mention_with_foreign_character(self):
+        character = Character.objects.create(project=self.other_project, name="Ariadna ajena")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(CharacterMention.objects.exists())
+
+    def test_user_cannot_create_mention_with_foreign_node(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.other_project, title="Escena ajena")
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(CharacterMention.objects.exists())
+
+    def test_create_mention_from_node_preselects_valid_node(self):
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{self.mention_create_url()}?node={node.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial["node"], node.pk)
+
+    def test_create_mention_from_character_preselects_valid_character(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{self.mention_create_url()}?character={character.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial["character"], character.pk)
+
+    def test_user_can_edit_own_mention_type(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        mention = CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            self.mention_edit_url(mention),
+            self.mention_payload(character, node, mention_type=CharacterMention.MentionType.POV),
+        )
+
+        mention.refresh_from_db()
+        self.assertRedirects(response, self.detail_url(character))
+        self.assertEqual(mention.mention_type, CharacterMention.MentionType.POV)
+
+    def test_user_cannot_edit_foreign_mention(self):
+        character = Character.objects.create(project=self.other_project, name="Ariadna ajena")
+        node = ManuscriptNode.objects.create(project=self.other_project, title="Escena ajena")
+        mention = CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.mention_edit_url(mention, self.project))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_user_can_delete_own_mention(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        mention = CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_delete_url(mention))
+
+        self.assertRedirects(response, self.detail_url(character))
+        self.assertFalse(CharacterMention.objects.filter(pk=mention.pk).exists())
+
+    def test_user_cannot_delete_foreign_mention(self):
+        character = Character.objects.create(project=self.other_project, name="Ariadna ajena")
+        node = ManuscriptNode.objects.create(project=self.other_project, title="Escena ajena")
+        mention = CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_delete_url(mention, self.project))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(CharacterMention.objects.filter(pk=mention.pk).exists())
+
+    def test_exact_duplicate_mentions_are_not_allowed(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ya existe una mención idéntica")
+        self.assertEqual(CharacterMention.objects.count(), 1)
+
+    def test_multiple_mention_types_for_same_character_and_node_are_allowed(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            self.mention_create_url(),
+            self.mention_payload(character, node, mention_type=CharacterMention.MentionType.POV),
+        )
+
+        self.assertRedirects(response, self.detail_url(character))
+        self.assertEqual(CharacterMention.objects.filter(character=character, node=node).count(), 2)
+
+    def test_node_detail_shows_mentioned_characters(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.NARRATOR,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.node_detail_url(node))
+
+        self.assertContains(response, "Personajes en esta parte")
+        self.assertContains(response, character.name)
+        self.assertContains(response, CharacterMention.MentionType.NARRATOR.label)
+
+    def test_character_detail_shows_mentioned_nodes(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.MENTIONED,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.detail_url(character))
+
+        self.assertContains(response, "Apariciones y menciones")
+        self.assertContains(response, node.title)
+        self.assertContains(response, CharacterMention.MentionType.MENTIONED.label)
+
+    def test_character_list_shows_mention_and_appearance_counts(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.APPEARS,
+        )
+        CharacterMention.objects.create(
+            character=character,
+            node=node,
+            mention_type=CharacterMention.MentionType.POV,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.list_url())
+        listed_character = response.context["characters"][0]
+
+        self.assertContains(response, "Menciones")
+        self.assertContains(response, "Apariciones")
+        self.assertEqual(listed_character.mention_count, 2)
+        self.assertEqual(listed_character.appearance_count, 1)
+
+    def test_cannot_create_mention_in_deleted_project(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        self.project.status = Project.ProjectStatus.DELETED
+        self.project.deleted_at = timezone.now()
+        self.project.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
+
+        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertFalse(CharacterMention.objects.exists())
+
+    def test_cannot_create_mention_in_pending_deletion_project(self):
+        character = Character.objects.create(project=self.project, name="Ariadna")
+        node = ManuscriptNode.objects.create(project=self.project, title="Escena propia")
+        self.project.mark_for_deletion()
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
+
+        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertFalse(CharacterMention.objects.exists())
 
     def test_character_list_only_shows_current_project_characters(self):
         own_character = Character.objects.create(project=self.project, name="Ariadna")

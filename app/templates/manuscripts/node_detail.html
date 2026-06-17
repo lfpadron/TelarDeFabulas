@@ -25,6 +25,46 @@
         <p>{{ node.content|linebreaksbr }}</p>
     {% endif %}
 
+    <h2>{% trans "Personajes en esta parte" %}</h2>
+    <div class="actions">
+        {% if can_manage_mentions %}
+            <a class="button" href="{% url 'characters:mention_create' project.pk %}?node={{ node.pk }}&next={{ request.get_full_path|urlencode }}">{% trans "Agregar personaje" %}</a>
+        {% endif %}
+    </div>
+    {% if node_mentions %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{% trans "Personaje" %}</th>
+                        <th>{% trans "Tipo de mención" %}</th>
+                        <th>{% trans "Acciones" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mention in node_mentions %}
+                        <tr>
+                            <td><a href="{% url 'characters:detail' project.pk mention.character.pk %}">{{ mention.character.name }}</a></td>
+                            <td>{{ mention.get_mention_type_display }}</td>
+                            <td>
+                                {% if can_manage_mentions %}
+                                    <div class="actions">
+                                        <a href="{% url 'characters:mention_edit' project.pk mention.pk %}?next={{ request.get_full_path|urlencode }}">{% trans "editar tipo de mención" %}</a>
+                                        <a href="{% url 'characters:mention_delete' project.pk mention.pk %}?next={{ request.get_full_path|urlencode }}">{% trans "quitar mención" %}</a>
+                                    </div>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>{% trans "Todavía no hay personajes asociados a esta parte del manuscrito." %}</p>
+    {% endif %}
+
     <div class="actions">
         <a class="button secondary" href="{% url 'manuscripts:tree' project.pk %}">{% trans "Volver al manuscrito" %}</a>
         {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}

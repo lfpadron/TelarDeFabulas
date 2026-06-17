@@ -2,9 +2,10 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from apps.manuscripts.models import ManuscriptNode
 from apps.projects.models import Project
 
-from .models import Character, CharacterDramaticRole
+from .models import Character, CharacterDramaticRole, CharacterMention
 
 
 class CharacterForm(forms.ModelForm):
@@ -102,3 +103,69 @@ class CharacterForm(forms.ModelForm):
             for role in selected_roles:
                 CharacterDramaticRole.objects.create(character=character, role=role)
         return character
+
+
+class CharacterMentionForm(forms.ModelForm):
+    class Meta:
+        model = CharacterMention
+        fields = ("character", "node", "mention_type")
+        labels = {
+            "character": _("Personaje"),
+            "node": _("Nodo de manuscrito"),
+            "mention_type": _("Tipo de mención"),
+        }
+
+    def __init__(self, *args, project=None, initial_character=None, initial_node=None, **kwargs):
+        self.project = project
+        super().__init__(*args, **kwargs)
+        if project is not None:
+            self.fields["character"].queryset = Character.objects.filter(project=project).order_by("name")
+            self.fields["node"].queryset = ManuscriptNode.objects.filter(project=project).order_by(
+                "parent_id",
+                "position",
+                "title",
+            )
+        else:
+            self.fields["character"].queryset = Character.objects.none()
+            self.fields["node"].queryset = ManuscriptNode.objects.none()
+
+        if initial_character is not None and not self.is_bound:
+            self.initial["character"] = initial_character.pk
+        if initial_node is not None and not self.is_bound:
+            self.initial["node"] = initial_node.pk
+        if not self.is_bound and not self.instance.pk:
+            self.initial["mention_type"] = CharacterMention.MentionType.APPEARS
+
+    def clean(self):
+        cleaned_data = super().clean()
+        character = cleaned_data.get("character")
+        node = cleaned_data.get("node")
+        mention_type = cleaned_data.get("mention_type")
+
+        if self.project and self.project.status in (
+            Project.ProjectStatus.DELETED,
+            Project.ProjectStatus.PENDING_DELETION,
+        ):
+            raise ValidationError(_("No se pueden gestionar menciones en proyectos eliminados o pendientes de borrado."))
+
+        if character and self.project and character.project_id != self.project.id:
+            raise ValidationError({"character": _("El personaje debe pertenecer al proyecto actual.")})
+
+        if node and self.project and node.project_id != self.project.id:
+            raise ValidationError({"node": _("El nodo debe pertenecer al proyecto actual.")})
+
+        if character and node and character.project_id != node.project_id:
+            raise ValidationError(_("El personaje y el nodo deben pertenecer al mismo proyecto."))
+
+        if character and node and mention_type:
+            duplicate_mentions = CharacterMention.objects.filter(
+                character=character,
+                node=node,
+                mention_type=mention_type,
+            )
+            if self.instance.pk:
+                duplicate_mentions = duplicate_mentions.exclude(pk=self.instance.pk)
+            if duplicate_mentions.exists():
+                raise ValidationError(_("Ya existe una mención idéntica para este personaje, nodo y tipo."))
+
+        return cleaned_data

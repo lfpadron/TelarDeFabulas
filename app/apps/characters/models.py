@@ -231,6 +231,16 @@ class CharacterMention(models.Model):
         super().clean()
         if self.character_id and self.node_id and self.character.project_id != self.node.project_id:
             raise ValidationError(_("El personaje y el nodo deben pertenecer al mismo proyecto."))
+        if self.character_id and self.node_id and self.mention_type:
+            duplicate_mentions = self.__class__.objects.filter(
+                character_id=self.character_id,
+                node_id=self.node_id,
+                mention_type=self.mention_type,
+            )
+            if self.pk:
+                duplicate_mentions = duplicate_mentions.exclude(pk=self.pk)
+            if duplicate_mentions.exists():
+                raise ValidationError(_("Ya existe una mención idéntica para este personaje, nodo y tipo."))
 
     def save(self, *args, **kwargs):
         self.full_clean()

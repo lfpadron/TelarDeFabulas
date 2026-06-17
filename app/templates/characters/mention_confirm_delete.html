@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Quitar mención" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Quitar mención" %}</h1>
+    <p>
+        {% blocktrans with character=mention.character.name node=mention.node.title type=mention.get_mention_type_display %}
+            ¿Quieres quitar la mención {{ type }} de {{ character }} en {{ node }}?
+        {% endblocktrans %}
+    </p>
+
+    <form method="post">
+        {% csrf_token %}
+        {% if return_url %}
+            <input type="hidden" name="next" value="{{ return_url }}">
+        {% endif %}
+        <button class="button warning" type="submit">{% trans "Quitar mención" %}</button>
+        {% if return_url %}
+            <a class="button secondary" href="{{ return_url }}">{% trans "Cancelar" %}</a>
+        {% else %}
+            <a class="button secondary" href="{% url 'characters:list' project.pk %}">{% trans "Cancelar" %}</a>
+        {% endif %}
+    </form>
+</section>
+{% endblock %}

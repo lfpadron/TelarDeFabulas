@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{{ title }}</h1>
+    <p class="muted">{% trans "Proyecto" %}: {{ project.name }}</p>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if return_url %}
+            <input type="hidden" name="next" value="{{ return_url }}">
+        {% endif %}
+        {{ form.as_p }}
+        <button class="button" type="submit">{{ submit_label }}</button>
+        {% if return_url %}
+            <a class="button secondary" href="{{ return_url }}">{% trans "Volver" %}</a>
+        {% else %}
+            <a class="button secondary" href="{% url 'characters:list' project.pk %}">{% trans "Volver a personajes" %}</a>
+        {% endif %}
+    </form>
+</section>
+{% endblock %}

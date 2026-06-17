@@ -247,6 +247,9 @@ http://localhost:8000/projects/<id>/characters/create/
 http://localhost:8000/projects/<id>/characters/<character_id>/
 http://localhost:8000/projects/<id>/characters/<character_id>/edit/
 http://localhost:8000/projects/<id>/characters/<character_id>/delete/
+http://localhost:8000/projects/<id>/mentions/create/
+http://localhost:8000/projects/<id>/mentions/<mention_id>/edit/
+http://localhost:8000/projects/<id>/mentions/<mention_id>/delete/
 ```
 
 Importancia narrativa:
@@ -296,13 +299,42 @@ El campo `image` acepta archivos con extensiones comunes (`jpg`, `jpeg`, `png`, 
 
 Menciones:
 
-`CharacterMention` deja preparada la relación entre personajes y nodos de manuscrito. En esta fase no hay interfaz completa por escena; el modelo y admin validan que personaje y nodo pertenezcan al mismo proyecto.
+`CharacterMention` relaciona personajes con nodos de manuscrito para responder dos preguntas: en qué partes aparece un personaje y qué personajes aparecen o se mencionan en una escena, capítulo o fragmento.
+
+Desde el detalle de un nodo de manuscrito se puede agregar una mención preseleccionando el nodo:
+
+```text
+/projects/<id>/mentions/create/?node=<node_id>
+```
+
+Desde el detalle de un personaje se puede agregar una mención preseleccionando el personaje:
+
+```text
+/projects/<id>/mentions/create/?character=<character_id>
+```
+
+Tipos de mención:
+
+- `APPEARS`: el personaje aparece físicamente o participa en el nodo.
+- `MENTIONED`: el personaje es mencionado, pero no necesariamente aparece.
+- `POV`: el nodo usa el punto de vista del personaje.
+- `NARRATOR`: el personaje funciona como narrador del nodo.
+- `IMPORTANT_FOR_SCENE`: el personaje es importante para la escena aunque su presencia sea indirecta.
+
+Reglas v01:
+
+- Un usuario solo puede gestionar menciones dentro de sus propios proyectos.
+- No se gestionan menciones en proyectos `DELETED` o `PENDING_DELETION`.
+- El personaje y el nodo deben pertenecer al mismo proyecto.
+- No se permiten duplicados exactos de personaje, nodo y tipo de mención.
+- Sí se permiten varios tipos de mención para el mismo personaje y nodo.
+- La lista de personajes muestra conteo total de menciones y conteo de apariciones `APPEARS`.
 
 Pruebas de personajes:
 
 ```powershell
 podman compose exec web python manage.py test apps.characters
-podman compose exec web python manage.py test apps.accounts apps.projects apps.manuscripts apps.characters
+podman compose exec web python manage.py test apps.accounts apps.projects apps.manuscripts apps.characters apps.notes apps.styles apps.exports
 podman compose exec web python manage.py makemigrations --check --dry-run
 ```
 

@@ -31,6 +31,8 @@
                         <th>{% trans "Rol narrativo" %}</th>
                         <th>{% trans "Estado" %}</th>
                         <th>{% trans "Completitud" %}</th>
+                        <th>{% trans "Menciones" %}</th>
+                        <th>{% trans "Apariciones" %}</th>
                         <th>{% trans "Acciones" %}</th>
                     </tr>
                 </thead>
@@ -49,6 +51,8 @@
                             </td>
                             <td>{{ character.get_completion_status_display }}</td>
                             <td>{{ character.completion_percentage }}%</td>
+                            <td>{{ character.mention_count }}</td>
+                            <td>{{ character.appearance_count }}</td>
                             <td>
                                 <div class="actions">
                                     <a href="{% url 'characters:detail' project.pk character.pk %}">{% trans "ver" %}</a>

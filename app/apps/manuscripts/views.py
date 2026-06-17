@@ -84,7 +84,17 @@ def node_create(request, project_pk):
 def node_detail(request, project_pk, node_pk):
     project = get_user_project(request.user, project_pk)
     node = get_project_node(project, node_pk)
-    return render(request, "manuscripts/node_detail.html", {"project": project, "node": node})
+    node_mentions = node.character_mentions.select_related("character").order_by("character__name", "mention_type")
+    return render(
+        request,
+        "manuscripts/node_detail.html",
+        {
+            "project": project,
+            "node": node,
+            "node_mentions": node_mentions,
+            "can_manage_mentions": project_allows_manuscript_changes(project),
+        },
+    )
 
 
 @login_required

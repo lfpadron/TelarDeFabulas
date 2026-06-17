@@ -39,6 +39,15 @@ class CharacterDramaticRoleAdmin(admin.ModelAdmin):
 
 @admin.register(CharacterMention)
 class CharacterMentionAdmin(admin.ModelAdmin):
-    list_display = ("character", "node", "mention_type", "updated_at")
-    list_filter = ("mention_type", "created_at")
-    search_fields = ("character__name", "node__title", "character__project__name")
+    list_display = ("character", "node", "mention_type", "project", "created_at")
+    list_filter = ("mention_type", "created_at", "updated_at")
+    search_fields = (
+        "character__name",
+        "node__title",
+        "character__project__name",
+        "character__project__user__email",
+    )
+
+    @admin.display(description=_("proyecto"))
+    def project(self, obj):
+        return obj.character.project
