@@ -10,6 +10,7 @@
     <div class="actions">
         <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
         {% if can_create_export %}
+            <a class="button secondary" href="{% url 'exports:preview' project.pk %}">{% trans "Previsualizar HTML" %}</a>
             <a class="button" href="{% url 'exports:create' project.pk %}">{% trans "Nueva exportación" %}</a>
         {% else %}
             <p class="warning-note">{% trans "Este proyecto no permite nuevas exportaciones por su estado actual." %}</p>

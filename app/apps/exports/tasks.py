@@ -5,6 +5,7 @@ from django.utils.translation import gettext as _
 from config.celery import app
 
 from .docx import build_export_docx
+from .epub import build_export_epub
 from .models import ExportJob
 from .pdf import build_export_pdf
 from .services import build_export_html
@@ -28,6 +29,9 @@ def generate_export_job(export_job_id):
         elif export_job.format == ExportJob.ExportFormat.PDF:
             pdf_content = build_export_pdf(export_job)
             export_job.file.save(f"{export_job.pk}.pdf", ContentFile(pdf_content), save=False)
+        elif export_job.format == ExportJob.ExportFormat.EPUB:
+            epub_content = build_export_epub(export_job)
+            export_job.file.save(f"{export_job.pk}.epub", ContentFile(epub_content), save=False)
         else:
             raise NotImplementedError(_("Formato todavía no implementado."))
 

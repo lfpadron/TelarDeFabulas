@@ -7,12 +7,13 @@
 <section class="panel">
     <h1>{% trans "Nueva exportación" %}: {{ project.name }}</h1>
 
-    <p class="muted">{% trans "En esta fase se genera HTML, DOCX y PDF. EPUB queda preparado para una fase posterior." %}</p>
+    <p class="muted">{% trans "En esta fase se genera HTML, DOCX, PDF y EPUB." %}</p>
 
     <form method="post" novalidate>
         {% csrf_token %}
         {{ form.as_p }}
         <button class="button" type="submit">{% trans "Crear exportación" %}</button>
+        <a class="button secondary" href="{% url 'exports:preview' project.pk %}">{% trans "Previsualizar HTML" %}</a>
         <a class="button secondary" href="{% url 'exports:list' project.pk %}">{% trans "Volver a exportaciones" %}</a>
     </form>
 </section>

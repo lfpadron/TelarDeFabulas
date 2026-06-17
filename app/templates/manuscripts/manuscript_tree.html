@@ -15,6 +15,7 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        <a class="button secondary" href="{% url 'exports:preview' project.pk %}">{% trans "Previsualizar HTML" %}</a>
         <a class="button" href="{% url 'exports:create' project.pk %}">{% trans "Exportar manuscrito" %}</a>
         {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
             <a class="button" href="{% url 'manuscripts:create' project.pk %}">{% trans "Crear nodo" %}</a>

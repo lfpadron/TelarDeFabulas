@@ -1,6 +1,8 @@
 import shutil
 import tempfile
+import zipfile
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 
 from docx import Document
@@ -97,9 +99,21 @@ class ExportJobTests(TestCase):
         payload.update(overrides)
         return payload
 
+    def preview_payload(self, **overrides):
+        payload = {
+            "root_node": "",
+            "style_template": self.system_style.pk,
+        }
+        payload.update(overrides)
+        return payload
+
     def create_url(self, project=None):
         project = project or self.project
         return reverse("exports:create", kwargs={"project_pk": project.pk})
+
+    def preview_url(self, project=None):
+        project = project or self.project
+        return reverse("exports:preview", kwargs={"project_pk": project.pk})
 
     def list_url(self, project=None):
         project = project or self.project
@@ -128,6 +142,17 @@ class ExportJobTests(TestCase):
         export_job.refresh_from_db()
         with export_job.file.open("rb") as exported_file:
             return exported_file.read()
+
+    def export_epub_bytes_for_job(self, export_job):
+        export_job.refresh_from_db()
+        with export_job.file.open("rb") as exported_file:
+            return exported_file.read()
+
+    def export_epub_text_for_job(self, export_job):
+        epub_content = self.export_epub_bytes_for_job(export_job)
+        with zipfile.ZipFile(BytesIO(epub_content)) as epub_zip:
+            xhtml_names = [name for name in epub_zip.namelist() if name.endswith(".xhtml")]
+            return "\n".join(epub_zip.read(name).decode("utf-8") for name in xhtml_names)
 
     def test_authenticated_user_can_create_html_export_for_own_project(self):
         self.client.force_login(self.premium_user)
@@ -174,6 +199,17 @@ class ExportJobTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertFalse(ExportJob.objects.filter(project=self.other_project).exists())
 
+    def test_user_cannot_create_epub_export_for_project_from_another_user(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.post(
+            self.create_url(self.other_project),
+            self.export_payload(format=ExportJob.ExportFormat.EPUB),
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(ExportJob.objects.filter(project=self.other_project).exists())
+
     def test_user_cannot_use_root_node_from_another_project(self):
         self.client.force_login(self.premium_user)
 
@@ -191,6 +227,17 @@ class ExportJobTests(TestCase):
         response = self.client.post(
             self.create_url(),
             self.export_payload(root_node=self.other_node.pk, format=ExportJob.ExportFormat.PDF),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExportJob.objects.exists())
+
+    def test_user_cannot_use_epub_root_node_from_another_project(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.post(
+            self.create_url(),
+            self.export_payload(root_node=self.other_node.pk, format=ExportJob.ExportFormat.EPUB),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -238,6 +285,17 @@ class ExportJobTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(ExportJob.objects.exists())
 
+    def test_user_cannot_use_epub_style_from_another_user(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.post(
+            self.create_url(),
+            self.export_payload(style_template=self.other_style.pk, format=ExportJob.ExportFormat.EPUB),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExportJob.objects.exists())
+
     def test_free_user_can_use_system_style(self):
         self.client.force_login(self.free_user)
 
@@ -250,7 +308,7 @@ class ExportJobTests(TestCase):
         export_job = ExportJob.objects.get(project=self.free_project)
         self.assertRedirects(response, self.detail_url(export_job, self.free_project))
 
-    def test_form_offers_html_docx_and_pdf_only(self):
+    def test_form_offers_html_docx_pdf_and_epub(self):
         self.client.force_login(self.premium_user)
 
         response = self.client.get(self.create_url())
@@ -262,9 +320,150 @@ class ExportJobTests(TestCase):
                 (ExportJob.ExportFormat.HTML, "HTML"),
                 (ExportJob.ExportFormat.DOCX, "DOCX"),
                 (ExportJob.ExportFormat.PDF, "PDF"),
+                (ExportJob.ExportFormat.EPUB, "EPUB"),
             ],
         )
-        self.assertNotIn(ExportJob.ExportFormat.EPUB, [value for value, label in choices])
+
+    def test_unauthenticated_user_is_redirected_from_preview(self):
+        response = self.client.get(self.preview_url())
+
+        self.assertRedirects(response, f"{reverse('login')}?next={self.preview_url()}")
+
+    def test_authenticated_user_can_preview_own_project(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Telar de Fábulas")
+        self.assertContains(response, "Libro raíz")
+        self.assertContains(response, "Texto del libro.")
+
+    def test_user_cannot_preview_project_from_another_user(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(self.other_project), self.preview_payload())
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_user_cannot_preview_with_root_node_from_another_project(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload(root_node=self.other_node.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["preview_result"])
+        self.assertNotContains(response, "Nodo ajeno")
+
+    def test_user_can_preview_with_system_style(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload(style_template=self.system_style.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Libro raíz")
+
+    def test_user_can_preview_with_own_style(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload(style_template=self.own_style.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Libro raíz")
+
+    def test_user_cannot_preview_with_style_from_another_user(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload(style_template=self.other_style.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["preview_result"])
+
+    def test_preview_does_not_create_export_job(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExportJob.objects.exists())
+
+    def test_preview_does_not_write_media_files(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([path for path in Path(self.media_root).rglob("*") if path.is_file()], [])
+
+    def test_preview_does_not_include_notes(self):
+        Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Nota secreta")
+        self.assertNotContains(response, "Contenido interno de nota")
+
+    def test_preview_with_root_node_includes_descendants_only(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload(root_node=self.chapter.pk))
+        html = response.context["preview_result"].html
+
+        self.assertIn("Capítulo uno", html)
+        self.assertIn("Escena secreta", html)
+        self.assertNotIn("Libro raíz", html)
+        self.assertNotIn("Escena fuera del capítulo", html)
+
+    def test_preview_without_root_node_includes_full_manuscript(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload(root_node=""))
+
+        self.assertContains(response, "Libro raíz")
+        self.assertContains(response, "Capítulo uno")
+        self.assertContains(response, "Escena secreta")
+
+    @override_settings(EXPORT_PREVIEW_MAX_NODES=1, EXPORT_PREVIEW_MAX_WORDS=2500)
+    def test_preview_truncates_by_node_limit(self):
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload())
+
+        self.assertTrue(response.context["preview_result"].truncated)
+        self.assertEqual(response.context["preview_result"].node_count, 1)
+        self.assertContains(
+            response,
+            "Vista previa limitada. Exporta el archivo completo para ver todo el manuscrito.",
+        )
+        self.assertNotIn("Capítulo uno", response.context["preview_result"].html)
+
+    @override_settings(EXPORT_PREVIEW_MAX_NODES=12, EXPORT_PREVIEW_MAX_WORDS=3)
+    def test_preview_truncates_by_word_limit(self):
+        self.book.content = "uno dos tres cuatro cinco"
+        self.book.save()
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(), self.preview_payload())
+
+        self.assertTrue(response.context["preview_result"].truncated)
+        self.assertEqual(response.context["preview_result"].word_count, 3)
+        self.assertContains(response, "uno dos tres...")
+        self.assertNotContains(response, "cuatro")
+
+    def test_preview_redirects_for_pending_deletion_project(self):
+        pending_project = Project.objects.create(
+            user=self.premium_user,
+            name="Proyecto pendiente preview",
+            status=Project.ProjectStatus.PENDING_DELETION,
+            deletion_requested_at=timezone.now(),
+        )
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.preview_url(pending_project), self.preview_payload())
+
+        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": pending_project.pk}))
 
     def test_create_export_starts_as_pending(self):
         self.client.force_login(self.premium_user)
@@ -295,6 +494,17 @@ class ExportJobTests(TestCase):
         export_job = ExportJob.objects.get(project=self.project)
         self.assertRedirects(response, self.detail_url(export_job))
         self.assertEqual(export_job.format, ExportJob.ExportFormat.PDF)
+        delay.assert_called_once_with(export_job.pk)
+
+    def test_authenticated_user_can_create_epub_export_for_own_project(self):
+        self.client.force_login(self.premium_user)
+
+        with patch("apps.exports.views.generate_export_job.delay") as delay:
+            response = self.client.post(self.create_url(), self.export_payload(format=ExportJob.ExportFormat.EPUB))
+
+        export_job = ExportJob.objects.get(project=self.project)
+        self.assertRedirects(response, self.detail_url(export_job))
+        self.assertEqual(export_job.format, ExportJob.ExportFormat.EPUB)
         delay.assert_called_once_with(export_job.pk)
 
     def test_task_generates_html_file_and_marks_done(self):
@@ -405,10 +615,11 @@ class ExportJobTests(TestCase):
         self.assertIn(".pdf", response["Content-Disposition"])
         self.assertTrue(content.startswith(b"%PDF"))
 
-    def test_task_marks_epub_failed_and_saves_clear_error(self):
+    def test_task_generates_epub_file_and_marks_done(self):
         export_job = ExportJob.objects.create(
             user=self.premium_user,
             project=self.project,
+            root_node=self.book,
             style_template=self.system_style,
             format=ExportJob.ExportFormat.EPUB,
         )
@@ -416,9 +627,37 @@ class ExportJobTests(TestCase):
         generate_export_job.run(export_job.pk)
 
         export_job.refresh_from_db()
-        self.assertEqual(export_job.status, ExportJob.ExportStatus.FAILED)
-        self.assertIn("formato", export_job.error_message.lower())
-        self.assertIsNotNone(export_job.finished_at)
+        epub_content = self.export_epub_bytes_for_job(export_job)
+        self.assertEqual(export_job.status, ExportJob.ExportStatus.DONE)
+        self.assertTrue(export_job.file.name.endswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}.epub"))
+        self.assertGreater(len(epub_content), 0)
+        self.assertTrue(zipfile.is_zipfile(BytesIO(epub_content)))
+        with zipfile.ZipFile(BytesIO(epub_content)) as epub_zip:
+            names = epub_zip.namelist()
+            self.assertIn("mimetype", names)
+            self.assertEqual(epub_zip.read("mimetype"), b"application/epub+zip")
+            self.assertIn("META-INF/container.xml", names)
+            self.assertTrue(any(name.endswith(".xhtml") for name in names))
+
+    def test_download_forces_epub_attachment(self):
+        export_job = ExportJob.objects.create(
+            user=self.premium_user,
+            project=self.project,
+            root_node=self.book,
+            style_template=self.system_style,
+            format=ExportJob.ExportFormat.EPUB,
+        )
+        generate_export_job.run(export_job.pk)
+        self.client.force_login(self.premium_user)
+
+        response = self.client.get(self.download_url(export_job))
+
+        content = b"".join(response.streaming_content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/epub+zip")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertIn(".epub", response["Content-Disposition"])
+        self.assertTrue(zipfile.is_zipfile(BytesIO(content)))
 
     def test_exporting_chapter_includes_its_scenes(self):
         export_job = ExportJob.objects.create(
@@ -512,6 +751,38 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Capítulo uno", html)
         self.assertNotIn("Escena fuera del capítulo", html)
 
+    def test_epub_exporting_chapter_includes_its_scenes(self):
+        export_job = ExportJob.objects.create(
+            user=self.premium_user,
+            project=self.project,
+            root_node=self.chapter,
+            style_template=self.system_style,
+            format=ExportJob.ExportFormat.EPUB,
+        )
+
+        generate_export_job.run(export_job.pk)
+        text = self.export_epub_text_for_job(export_job)
+
+        self.assertIn("Capítulo uno", text)
+        self.assertIn("Escena secreta", text)
+        self.assertNotIn("Escena fuera del capítulo", text)
+
+    def test_epub_exporting_scene_only_includes_that_scene(self):
+        export_job = ExportJob.objects.create(
+            user=self.premium_user,
+            project=self.project,
+            root_node=self.scene,
+            style_template=self.system_style,
+            format=ExportJob.ExportFormat.EPUB,
+        )
+
+        generate_export_job.run(export_job.pk)
+        text = self.export_epub_text_for_job(export_job)
+
+        self.assertIn("Escena secreta", text)
+        self.assertNotIn("Capítulo uno", text)
+        self.assertNotIn("Escena fuera del capítulo", text)
+
     def test_generated_html_does_not_include_notes(self):
         Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
         export_job = ExportJob.objects.create(
@@ -554,6 +825,21 @@ class ExportJobTests(TestCase):
 
         self.assertNotIn("Nota secreta", html)
         self.assertNotIn("Contenido interno de nota", html)
+
+    def test_generated_epub_does_not_include_notes(self):
+        Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
+        export_job = ExportJob.objects.create(
+            user=self.premium_user,
+            project=self.project,
+            style_template=self.system_style,
+            format=ExportJob.ExportFormat.EPUB,
+        )
+
+        generate_export_job.run(export_job.pk)
+        text = self.export_epub_text_for_job(export_job)
+
+        self.assertNotIn("Nota secreta", text)
+        self.assertNotIn("Contenido interno de nota", text)
 
     def test_list_only_shows_exports_for_current_project(self):
         second_project = Project.objects.create(user=self.premium_user, name="Segundo proyecto")

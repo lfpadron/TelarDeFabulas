@@ -16,6 +16,7 @@ Base tecnica inicial de un SaaS Django con PostgreSQL, Redis, Celery, Celery Bea
 - uv
 - python-docx
 - WeasyPrint
+- EbookLib
 - Podman Compose / Docker Compose
 
 ## Requisitos
@@ -380,7 +381,7 @@ podman compose exec web python manage.py makemigrations --check --dry-run
 
 ## Estilos de exportacion
 
-La app `styles` gestiona plantillas de estilo usadas por las exportaciones a HTML, DOCX y PDF. EPUB queda preparado para una fase posterior.
+La app `styles` gestiona plantillas de estilo usadas por las exportaciones a HTML, DOCX, PDF y EPUB.
 
 Rutas disponibles:
 
@@ -437,6 +438,7 @@ Rutas disponibles:
 ```text
 http://localhost:8000/projects/<project_id>/exports/
 http://localhost:8000/projects/<project_id>/exports/create/
+http://localhost:8000/projects/<project_id>/exports/preview/
 http://localhost:8000/projects/<project_id>/exports/<export_id>/
 ```
 
@@ -453,7 +455,20 @@ Formatos v01:
 - La descarga se sirve desde Django como adjunto para bajar un único `.html` con CSS incrustado.
 - `DOCX`: implementado con `python-docx` y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.docx`.
 - `PDF`: implementado con `WeasyPrint` reutilizando el HTML/CSS de exportación y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.pdf`.
-- `EPUB`: queda preparado en el modelo para una fase futura, pero no se ofrece en la UI.
+- `EPUB`: implementado con `EbookLib` y guardado en `media/exports/<user_id>/<project_id>/<export_job_id>.epub`.
+
+Previsualización HTML limitada:
+
+- Disponible en `/projects/<project_id>/exports/preview/`.
+- Permite elegir nodo raíz y plantilla de estilo antes de crear una exportación real.
+- Renderiza en memoria el mismo HTML base usado por la exportación, pero no crea `ExportJob`, no encola Celery y no escribe archivos en `media`.
+- Si la vista se recorta, muestra: `Vista previa limitada. Exporta el archivo completo para ver todo el manuscrito.`
+- Los límites son configurables por entorno:
+
+```text
+EXPORT_PREVIEW_MAX_NODES=12
+EXPORT_PREVIEW_MAX_WORDS=2500
+```
 
 Reglas principales:
 
@@ -461,17 +476,18 @@ Reglas principales:
 - No se exportan proyectos `DELETED` ni `PENDING_DELETION`.
 - Si se elige nodo raíz, se exporta ese nodo y sus descendientes.
 - Si no se elige nodo raíz, se exportan todos los nodos raíz del proyecto y sus descendientes.
-- HTML, DOCX y PDF solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
+- HTML, DOCX, PDF y EPUB solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
 - Usuarios `FREE` pueden usar estilos del sistema.
 - Usuarios `PREMIUM` pueden usar estilos del sistema y estilos propios.
 
 Limitaciones actuales:
 
-- EPUB pendiente.
 - El índice DOCX es una lista simple; el índice dinámico de Word queda pendiente.
 - El índice PDF reutiliza el índice simple del HTML; índice avanzado pendiente.
 - La numeración de páginas DOCX queda pendiente.
 - Las fuentes del PDF usan las fuentes disponibles en el sistema; fuentes embebidas quedan pendientes.
+- EPUB no embebe fuentes; los lectores aplican sus propias reglas de margen y paginación.
+- Validación EPUB externa queda pendiente.
 
 Verificar el worker Celery:
 
@@ -550,9 +566,9 @@ Nginx queda pendiente para la configuracion de produccion.
 
 ## Siguiente fase sugerida
 
-1. Agregar vista previa simple de HTML exportado antes de descargar.
-2. Agregar interfaz completa para menciones de personajes por escena.
-3. Preparar reordenamiento de nodos del árbol narrativo.
-4. Implementar exportación EPUB.
+1. Agregar interfaz completa para menciones de personajes por escena.
+2. Preparar reordenamiento de nodos del árbol narrativo.
+3. Añadir validación externa opcional para EPUB.
+4. Mejorar la previsualización con paginación visual o modo lectura.
 5. Diseñar tablero futuro para pendientes sin implementarlo aún.
 # TelarDeFabulas

@@ -48,6 +48,7 @@ class ExportJobForm(forms.ModelForm):
             (ExportJob.ExportFormat.HTML, _("HTML")),
             (ExportJob.ExportFormat.DOCX, _("DOCX")),
             (ExportJob.ExportFormat.PDF, _("PDF")),
+            (ExportJob.ExportFormat.EPUB, _("EPUB")),
         )
 
     def clean(self):
@@ -77,3 +78,50 @@ class ExportJobForm(forms.ModelForm):
             export_job.full_clean()
             export_job.save()
         return export_job
+
+
+class ExportPreviewForm(forms.Form):
+    root_node = forms.ModelChoiceField(
+        label=_("Nodo raíz"),
+        queryset=ManuscriptNode.objects.none(),
+        required=False,
+    )
+    style_template = forms.ModelChoiceField(
+        label=_("Estilo"),
+        queryset=StyleTemplate.objects.none(),
+        required=True,
+    )
+
+    def __init__(self, *args, user=None, project=None, **kwargs):
+        self.user = user
+        self.project = project
+        super().__init__(*args, **kwargs)
+        if project is not None:
+            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).order_by(
+                "parent_id",
+                "position",
+                "title",
+            )
+        if user is not None:
+            self.fields["style_template"].queryset = StyleTemplate.objects.filter(
+                Q(is_system=True) | Q(user=user)
+            ).order_by("-is_system", "name")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        root_node = cleaned_data.get("root_node")
+        style_template = cleaned_data.get("style_template")
+
+        if self.project and self.project.status == Project.ProjectStatus.DELETED:
+            raise ValidationError(_("No se puede previsualizar un proyecto eliminado."))
+
+        if self.project and self.project.status == Project.ProjectStatus.PENDING_DELETION:
+            raise ValidationError(_("No se puede previsualizar un proyecto pendiente de borrado."))
+
+        if root_node and self.project and root_node.project_id != self.project.id:
+            raise ValidationError({"root_node": _("El nodo raíz debe pertenecer al mismo proyecto.")})
+
+        if style_template and self.user and not (style_template.is_system or style_template.user_id == self.user.id):
+            raise ValidationError({"style_template": _("El estilo debe ser del sistema o propio.")})
+
+        return cleaned_data

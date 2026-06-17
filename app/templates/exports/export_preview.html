@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Previsualizar HTML" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <h1>{% trans "Previsualizar HTML" %}: {{ project.name }}</h1>
+
+    <form method="get" novalidate>
+        {{ form.as_p }}
+        <div class="actions">
+            <button class="button" type="submit">{% trans "Previsualizar" %}</button>
+            <a class="button secondary" href="{% url 'exports:create' project.pk %}">{% trans "Crear exportación real" %}</a>
+            <a class="button secondary" href="{% url 'exports:list' project.pk %}">{% trans "Volver a exportaciones" %}</a>
+        </div>
+    </form>
+
+    {% if preview_result %}
+        <div class="actions" style="margin-top: 1rem;">
+            <p class="muted">
+                {% blocktrans with node_count=preview_result.node_count word_count=preview_result.word_count max_nodes=max_nodes max_words=max_words %}
+                    Mostrando {{ node_count }} nodos y {{ word_count }} palabras. Límite: {{ max_nodes }} nodos o {{ max_words }} palabras.
+                {% endblocktrans %}
+            </p>
+        </div>
+
+        {% if preview_result.truncated %}
+            <p class="warning-note">{% trans "Vista previa limitada. Exporta el archivo completo para ver todo el manuscrito." %}</p>
+        {% endif %}
+
+        <div style="border: 1px solid #d8d1c5; border-radius: 8px; margin-top: 1rem; overflow: hidden;">
+            <iframe
+                title="{% trans "Vista previa HTML del manuscrito" %}"
+                sandbox=""
+                srcdoc="{{ preview_result.html }}"
+                style="background: #ffffff; border: 0; display: block; min-height: 70vh; width: 100%;"
+            ></iframe>
+        </div>
+    {% else %}
+        <p class="muted">{% trans "Selecciona un estilo para generar la vista previa." %}</p>
+    {% endif %}
+</section>
+{% endblock %}

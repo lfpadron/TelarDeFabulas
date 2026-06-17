@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404
@@ -7,8 +8,9 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.projects.models import Project
 
-from .forms import ExportJobForm
+from .forms import ExportJobForm, ExportPreviewForm
 from .models import ExportJob
+from .services import render_export_html
 from .tasks import generate_export_job
 
 
@@ -33,12 +35,14 @@ DOWNLOAD_CONTENT_TYPES = {
     ExportJob.ExportFormat.HTML: "text/html; charset=utf-8",
     ExportJob.ExportFormat.DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ExportJob.ExportFormat.PDF: "application/pdf",
+    ExportJob.ExportFormat.EPUB: "application/epub+zip",
 }
 
 DOWNLOAD_EXTENSIONS = {
     ExportJob.ExportFormat.HTML: "html",
     ExportJob.ExportFormat.DOCX: "docx",
     ExportJob.ExportFormat.PDF: "pdf",
+    ExportJob.ExportFormat.EPUB: "epub",
 }
 
 
@@ -84,6 +88,51 @@ def export_create(request, project_pk):
         {
             "form": form,
             "project": project,
+        },
+    )
+
+
+@login_required
+def export_preview(request, project_pk):
+    project = get_user_project(request.user, project_pk)
+    if not project_allows_exports(project):
+        messages.error(request, _("No se puede previsualizar un proyecto eliminado o pendiente de borrado."))
+        return redirect("projects:detail", pk=project.pk)
+
+    preview_result = None
+    if request.GET:
+        form = ExportPreviewForm(request.GET, user=request.user, project=project)
+        if form.is_valid():
+            preview_result = render_export_html(
+                project=project,
+                root_node=form.cleaned_data["root_node"],
+                style_template=form.cleaned_data["style_template"],
+                max_nodes=settings.EXPORT_PREVIEW_MAX_NODES,
+                max_words=settings.EXPORT_PREVIEW_MAX_WORDS,
+                preview_mode=True,
+            )
+    else:
+        form = ExportPreviewForm(user=request.user, project=project)
+        default_style = form.fields["style_template"].queryset.first()
+        if default_style:
+            form.initial["style_template"] = default_style.pk
+            preview_result = render_export_html(
+                project=project,
+                style_template=default_style,
+                max_nodes=settings.EXPORT_PREVIEW_MAX_NODES,
+                max_words=settings.EXPORT_PREVIEW_MAX_WORDS,
+                preview_mode=True,
+            )
+
+    return render(
+        request,
+        "exports/export_preview.html",
+        {
+            "form": form,
+            "project": project,
+            "preview_result": preview_result,
+            "max_nodes": settings.EXPORT_PREVIEW_MAX_NODES,
+            "max_words": settings.EXPORT_PREVIEW_MAX_WORDS,
         },
     )
 

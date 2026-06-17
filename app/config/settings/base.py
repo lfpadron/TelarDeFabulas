@@ -14,6 +14,16 @@ def env_list(name, default=""):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def env_int(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 APP_DIR = Path(__file__).resolve().parent.parent.parent
 BASE_DIR = APP_DIR.parent
 
@@ -110,3 +120,6 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {}
+
+EXPORT_PREVIEW_MAX_NODES = env_int("EXPORT_PREVIEW_MAX_NODES", 12)
+EXPORT_PREVIEW_MAX_WORDS = env_int("EXPORT_PREVIEW_MAX_WORDS", 2500)
