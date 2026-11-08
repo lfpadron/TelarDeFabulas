@@ -4,6 +4,8 @@ from django.utils.translation import gettext as _
 
 from config.celery import app
 
+from apps.core.permissions import can_export_project
+
 from .docx import build_export_docx
 from .epub import build_export_epub
 from .models import ExportJob
@@ -20,6 +22,9 @@ def generate_export_job(export_job_id):
     export_job.save(update_fields=["status", "started_at", "error_message"])
 
     try:
+        if not can_export_project(export_job.user, export_job.project):
+            raise PermissionError("Export no longer authorized.")
+        export_job.full_clean(exclude=["file"])
         if export_job.format == ExportJob.ExportFormat.HTML:
             html_content = build_export_html(export_job)
             export_job.file.save(f"{export_job.pk}.html", ContentFile(html_content.encode("utf-8")), save=False)
@@ -39,8 +44,8 @@ def generate_export_job(export_job_id):
         export_job.finished_at = timezone.now()
         export_job.error_message = ""
         export_job.save(update_fields=["file", "status", "finished_at", "error_message"])
-    except Exception as exc:
+    except Exception:
         export_job.status = ExportJob.ExportStatus.FAILED
-        export_job.error_message = str(exc)
+        export_job.error_message = _("No se pudo generar la exportación. Revisa sus permisos y vuelve a intentarlo.")
         export_job.finished_at = timezone.now()
         export_job.save(update_fields=["status", "error_message", "finished_at"])

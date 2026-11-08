@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.manuscripts.models import ManuscriptNode
 from apps.projects.models import Project
 from apps.styles.models import StyleTemplate
+from apps.core.permissions import Action, project_allows_action
 
 
 def export_upload_path(instance, filename):
@@ -89,11 +90,8 @@ class ExportJob(models.Model):
         if self.project_id and self.user_id and self.project.user_id != self.user_id:
             errors["project"] = _("Solo puedes exportar proyectos propios.")
 
-        if self.project_id and self.project.status == Project.ProjectStatus.DELETED:
+        if self.project_id and not project_allows_action(self.project, Action.EXPORT):
             errors["project"] = _("No se puede exportar un proyecto eliminado.")
-
-        if self.project_id and self.project.status == Project.ProjectStatus.PENDING_DELETION:
-            errors["project"] = _("No se puede exportar un proyecto pendiente de borrado.")
 
         if self.root_node_id and self.project_id and self.root_node.project_id != self.project_id:
             errors["root_node"] = _("El nodo raíz debe pertenecer al mismo proyecto.")

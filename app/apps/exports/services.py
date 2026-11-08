@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from html import escape
+from decimal import Decimal, InvalidOperation
+import re
 
 from django.utils.translation import gettext as _
 
 from apps.manuscripts.models import WORD_RE, ManuscriptNode, count_words
+from apps.manuscripts.hierarchy import ordered_tree
 
 
 HEADING_TAGS = {
@@ -30,40 +33,54 @@ class ExportHtmlRenderResult:
 
 
 def css_font_name(font_name):
-    return escape(str(font_name).replace("\\", "").replace("'", "\\'"))
+    # A font family is data, never CSS syntax or a resource URL.
+    return re.sub(r"[^\w -]", "", str(font_name), flags=re.UNICODE)[:120] or "serif"
 
 
 def css_number(value):
-    return str(value).rstrip("0").rstrip(".")
+    try:
+        number = Decimal(str(value))
+    except InvalidOperation:
+        return "0"
+    return format(number.normalize(), "f") if number.is_finite() and number >= 0 else "0"
+
+
+def css_alignment(style):
+    return style.text_alignment.lower() if style.text_alignment in {"LEFT", "RIGHT", "CENTER", "JUSTIFY"} else "left"
 
 
 def ordered_project_nodes(project, root_node=None):
     nodes = list(
         ManuscriptNode.objects.filter(project=project)
-        .select_related("parent")
-        .order_by("parent_id", "position", "created_at")
+        .order_by("position", "created_at", "pk")
     )
     nodes_by_id = {node.id: node for node in nodes}
     children_by_parent = {}
     for node in nodes:
         children_by_parent.setdefault(node.parent_id, []).append(node)
 
-    ordered = []
-
-    def visit(node):
-        ordered.append(node)
-        for child in children_by_parent.get(node.id, []):
-            visit(child)
-
     if root_node:
         root = nodes_by_id.get(root_node.id)
-        if root:
-            visit(root)
-    else:
-        for root in children_by_parent.get(None, []):
-            visit(root)
-
+        if root is None:
+            return []
+        included, pending = set(), [root]
+        while pending:
+            node = pending.pop()
+            if node.pk in included:
+                continue
+            included.add(node.pk)
+            pending.extend(children_by_parent.get(node.pk, ()))
+        nodes = [node for node in nodes if node.pk in included]
+    ordered = []
+    for node, depth in ordered_tree(nodes):
+        node.export_depth = depth
+        ordered.append(node)
     return ordered
+
+
+def heading_level(node):
+    default = int(HEADING_TAGS.get(node.node_type, "h2")[1])
+    return min(6, getattr(node, "export_depth", default - 1) + 1)
 
 
 def ordered_export_nodes(export_job):
@@ -129,7 +146,7 @@ def render_toc(nodes):
         return ""
 
     items = "\n".join(
-        f'<li class="toc-item toc-{escape(node.node_type.lower())}"><a href="#node-{node.id}">{escape(node.title)}</a></li>'
+        f'<li class="toc-item toc-{escape(node.node_type.lower())}"><a href="#node-{node.id}">{escape(node.display_title)}</a></li>'
         for node in nodes
     )
     return f"""
@@ -143,7 +160,7 @@ def render_toc(nodes):
 
 
 def render_node(node, style_template, content=None):
-    tag = HEADING_TAGS.get(node.node_type, "h2")
+    tag = f"h{heading_level(node)}"
     content_html = render_content_blocks(node.content if content is None else content)
     separator = ""
     if node.node_type == ManuscriptNode.NodeType.SCENE and style_template.scene_separator:
@@ -151,7 +168,7 @@ def render_node(node, style_template, content=None):
 
     return f"""
 <section class="node node-{escape(node.node_type.lower())}" id="node-{node.id}">
-  <{tag}>{escape(node.title)}</{tag}>
+  <{tag}>{escape(node.display_title)}</{tag}>
   {content_html}
   {separator}
 </section>
@@ -169,9 +186,9 @@ def render_export_html(
     style = style_template
     nodes = ordered_project_nodes(project, root_node)
     render_nodes, truncated, word_count = limited_render_nodes(nodes, max_nodes, max_words)
-    title = root_node.title if root_node else project.name
+    title = root_node.display_title if root_node else project.name
     lang = project.locale or "es-mx"
-    text_alignment = style.text_alignment.lower().replace("_", "-")
+    text_alignment = css_alignment(style)
     fallback_family = "serif" if style.font_category == style.FontCategory.SERIF else "sans-serif"
     page_number_css = ""
     if style.include_page_numbers:
@@ -201,6 +218,7 @@ def render_export_html(
 <html lang="{escape(lang)}">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
   <title>{escape(title)}</title>
   <style>
     @page {{

@@ -7,7 +7,7 @@
 <section class="panel">
     <h1>{% trans "Quitar mención" %}</h1>
     <p>
-        {% blocktrans with character=mention.character.name node=mention.node.title type=mention.get_mention_type_display %}
+        {% blocktrans with character=mention.character.name node=mention.node.display_title type=mention.get_mention_type_display %}
             ¿Quieres quitar la mención {{ type }} de {{ character }} en {{ node }}?
         {% endblocktrans %}
     </p>

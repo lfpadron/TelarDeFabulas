@@ -2,6 +2,8 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.permissions import Action, check_project_permission, validate_project_action
+
 from .models import Project
 
 
@@ -25,6 +27,10 @@ class ProjectForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        if not self.instance._state.adding:
+            validate_project_action(self.instance)
+            if self.user:
+                check_project_permission(self.user, self.instance, Action.EDIT)
         if self.instance._state.adding and self.user and not Project.can_create_for_user(self.user):
             raise ValidationError(Project.limit_message_for_user(self.user))
         return cleaned_data

@@ -10,6 +10,7 @@ __pycache__/
 db.sqlite3
 
 media/
+private_media/
 staticfiles/
 
 .coverage

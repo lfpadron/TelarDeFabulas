@@ -1,0 +1,174 @@
+# Telar de Fabulas: inventario de datos
+
+Informe de solo lectura. Identificadores internos; sin contenido ni datos personales.
+
+## schema_version
+
+1
+
+## generated_at
+
+2026-11-07T02:11:23.729175+00:00
+
+## scope
+
+ALL_PROJECTS
+
+## summary
+
+| Indicador | Valor |
+| --- | --- |
+| records_by_model | {"users": 0, "projects": 0, "nodes": 0, "characters": 0, "notes": 0, "mentions": 0, "exports": 0} |
+| records_analyzed | 0 |
+| records_requiring_migration | 0 |
+| records_requiring_decision | 0 |
+| invalid_records | 0 |
+| potentially_problematic_records | 0 |
+| finding_count | 3 |
+| findings_by_severity | {"HIGH": 1, "LOW": 2} |
+| findings_by_compatibility | {"REQUIRES_MIGRATION": 2, "READY": 1} |
+| counting_note | "Registros unicos por (modelo,id) en cada indicador; indicadores pueden solaparse. Hallazgos de esquema/configuracion pueden afectar cero registros." |
+
+## users
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| by_type | {"FREE": 0, "PREMIUM": 0, "BUSINESS_ADMIN": 0, "TECH_ADMIN": 0} |
+| by_status | {"ACTIVE": 0, "FROZEN": 0, "PENDING_DELETION": 0, "DELETED": 0} |
+| administrators | 0 |
+| authentication_active | 0 |
+| project_counts | {"zero": 0, "one": 0, "multiple": 0} |
+| project_count_policy | "Incluye todos los estados; no aplica cupos ni calcula vencimientos." |
+
+## projects
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| by_status | {"ACTIVE": 0, "FROZEN": 0, "PENDING_DELETION": 0, "DELETED": 0} |
+| with_manuscript | 0 |
+| without_manuscript | 0 |
+| per_project | [] |
+
+## manuscripts
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| by_type | {"BOOK": 0, "PART": 0, "CHAPTER": 0, "SCENE": 0, "FRAGMENT": 0} |
+| by_status | {"PENDING": 0, "IN_PROGRESS": 0, "DRAFT": 0, "REVIEW": 0, "FINISHED": 0, "PUBLISHABLE": 0, "PUBLISHED": 0} |
+| root_node_ids | [] |
+| roots | 0 |
+| with_parent | 0 |
+| with_content | 0 |
+| without_content | 0 |
+| whitespace_only | 0 |
+| approximate_words | 0 |
+| word_count_source | "Contador persistido; no recalculado ni corregido." |
+| content_lengths | {"unit": "characters", "total": 0, "min": 0, "max": 0, "buckets": {"0": 0, "1-1000": 0, "1001-10000": 0, "10001-100000": 0, ">100000": 0}} |
+| empty_title_ids | [] |
+| description_field_present | false |
+| empty_descriptions | null |
+| hierarchy | {"cycles": [], "unreachable_node_ids": [], "max_depth_from_root": 0, "duplicate_positions": [], "affected_node_ids": []} |
+
+## scene_version_readiness
+
+| Indicador | Valor |
+| --- | --- |
+| total_scenes | 0 |
+| with_text | 0 |
+| empty | 0 |
+| non_scene_with_text | 0 |
+| non_scene_with_text_ids | [] |
+| fragment_ids | [] |
+| advanced_stages | 0 |
+| advanced_stage_ids | [] |
+| early_stages | 0 |
+| by_status | {"PENDING": 0, "IN_PROGRESS": 0, "DRAFT": 0, "REVIEW": 0, "FINISHED": 0, "PUBLISHABLE": 0, "PUBLISHED": 0} |
+| flag_ambiguity_ids | [] |
+
+## characters
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| with_image | 0 |
+| by_importance | {"PRINCIPAL": 0, "SECUNDARIA": 0, "FIGURANTE": 0} |
+
+## notes
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| with_node | 0 |
+| with_character | 0 |
+
+## mentions
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| by_type | {"APPEARS": 0, "MENTIONED": 0, "POV": 0, "NARRATOR": 0, "IMPORTANT_FOR_SCENE": 0} |
+
+## exports
+
+| Indicador | Valor |
+| --- | --- |
+| total | 0 |
+| with_root | 0 |
+| without_root | 0 |
+| by_status | {"PENDING": 0, "PROCESSING": 0, "DONE": 0, "FAILED": 0} |
+| by_format | {"HTML": 0, "DOCX": 0, "PDF": 0, "EPUB": 0} |
+| root_null_note | "NULL puede ser proyecto completo o una raiz borrada; no se puede reconstruir la intencion desde estos datos." |
+
+## dependencies
+
+| Indicador | Valor |
+| --- | --- |
+| by_node | [] |
+| nodes_with_multiple_references | [] |
+| duplicate_mention_groups | [] |
+| references_under_affected_hierarchy | {"notes": 0, "mentions": 0, "exports": 0} |
+| affected_node_ids_with_references | [] |
+| note | "Incluye descendientes de nodos a revisar; conservar PK evita perder relaciones al mover." |
+
+## files
+
+| Indicador | Valor |
+| --- | --- |
+| referenced_files | 0 |
+| unique_references | 0 |
+| by_model | {} |
+| by_status | {} |
+| extensions | {} |
+| outside_expected_location | 0 |
+| known_unique_size_bytes | 0 |
+| unique_files_with_known_size | 0 |
+| records | [] |
+| limitations | ["Solo metadata de referencias en DB; no se abren archivos ni se enumeran huerfanos.", "Tamano parcial si hay archivos no verificables; filesystem y DB no comparten snapshot."] |
+
+## findings
+
+- {"code": "DEBUG_MEDIA_ROUTE", "severity": "HIGH", "compatibility": "REQUIRES_MIGRATION", "message": "Con DEBUG, la configuracion actual sirve media directamente; requiere proteccion en otra fase. No se probaron URLs ni se publicaron archivos.", "affected_records": {}, "record_ids": {}}
+- {"code": "DESCRIPTION_FIELD_ABSENT", "severity": "LOW", "compatibility": "REQUIRES_MIGRATION", "message": "ManuscriptNode no tiene short_description; no se inventa un conteo de descripciones vacias.", "affected_records": {"nodes": 0}, "record_ids": {"nodes": []}}
+- {"code": "READ_ONLY_INVENTORY", "severity": "LOW", "compatibility": "READY", "message": "Inventario sin correcciones; conteos de categorias disjuntas y hallazgos potencialmente superpuestos.", "affected_records": {}, "record_ids": {}}
+
+## subscription_readiness
+
+| Indicador | Valor |
+| --- | --- |
+| trial | "REQUIRES_DECISION" |
+| monthly | "REQUIRES_MIGRATION" |
+| annual | "REQUIRES_MIGRATION" |
+| manual_payment | "REQUIRES_MIGRATION" |
+| stripe | "REQUIRES_MIGRATION" |
+| expired_read_only | "REQUIRES_MIGRATION" |
+| one_year_retention | "REQUIRES_DECISION" |
+| note | "No existen fechas de trial, pagos o suscripciones. No se infiere vigencia de user_type/status." |
+
+## limitations
+
+- "No incluye tablas de sesiones, permisos, estilos o papeles dramaticos en el total analizado."
+- "No incluye nombres, emails, titulos, texto, nombres de archivo ni rutas de media."
+- "Compatibilidad objetivo no implica corrupcion del modelo actual; no se ejecuta ninguna migracion."

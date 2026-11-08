@@ -1,27 +1,19 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 
 from apps.characters.models import Character
 from apps.manuscripts.models import ManuscriptNode
-from apps.projects.models import Project
+from apps.core.decorators import project_access
+from apps.core.permissions import Action, local_project_relations
 
 from .forms import NoteForm
 from .models import Note
 
 
-def get_user_project(user, project_pk):
-    return get_object_or_404(Project, pk=project_pk, user=user)
-
-
 def get_project_note(project, note_pk):
-    return get_object_or_404(Note, pk=note_pk, project=project)
-
-
-def project_allows_note_changes(project):
-    return project.status not in (Project.ProjectStatus.DELETED, Project.ProjectStatus.PENDING_DELETION)
+    return get_object_or_404(local_project_relations(Note.objects.all()), pk=note_pk, project=project)
 
 
 def filtered_notes(queryset, request):
@@ -53,9 +45,10 @@ def create_initial_for_project(project, query):
 
 
 @login_required
+@project_access()
 def note_list(request, project_pk):
-    project = get_user_project(request.user, project_pk)
-    notes = Note.objects.filter(project=project).select_related("node", "character")
+    project = request.project
+    notes = local_project_relations(Note.objects.filter(project=project)).select_related("node", "character")
     notes = filtered_notes(notes, request)
     return render(
         request,
@@ -74,11 +67,9 @@ def note_list(request, project_pk):
 
 
 @login_required
+@project_access(Action.CREATE)
 def note_create(request, project_pk):
-    project = get_user_project(request.user, project_pk)
-    if not project_allows_note_changes(project):
-        messages.error(request, _("No se pueden crear notas en proyectos eliminados o pendientes de borrado."))
-        return redirect("projects:detail", pk=project.pk)
+    project = request.project
 
     if request.method == "POST":
         form = NoteForm(request.POST, project=project)
@@ -102,18 +93,18 @@ def note_create(request, project_pk):
 
 
 @login_required
+@project_access()
 def note_detail(request, project_pk, note_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     note = get_project_note(project, note_pk)
     return render(request, "notes/note_detail.html", {"project": project, "note": note})
 
 
 @login_required
+@project_access(Action.EDIT)
 def note_edit(request, project_pk, note_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     note = get_project_note(project, note_pk)
-    if not project_allows_note_changes(project):
-        raise Http404(_("No se pueden editar notas en proyectos eliminados o pendientes de borrado."))
 
     if request.method == "POST":
         form = NoteForm(request.POST, instance=note, project=project)
@@ -138,8 +129,9 @@ def note_edit(request, project_pk, note_pk):
 
 
 @login_required
+@project_access(Action.DELETE)
 def note_delete(request, project_pk, note_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     note = get_project_note(project, note_pk)
 
     if request.method == "POST":

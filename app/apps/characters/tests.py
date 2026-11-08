@@ -1,5 +1,8 @@
 import shutil
 import tempfile
+from io import BytesIO
+
+from PIL import Image
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -137,7 +140,7 @@ class CharacterTests(TestCase):
 
         response = self.client.post(self.create_url(), self.character_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertEqual(response.status_code, 404)
         self.assertFalse(Character.objects.filter(project=self.project).exists())
 
     def test_cannot_create_character_in_pending_deletion_project(self):
@@ -146,7 +149,7 @@ class CharacterTests(TestCase):
 
         response = self.client.post(self.create_url(), self.character_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(Character.objects.filter(project=self.project).exists())
 
     def test_completion_percentage_uses_importance_specific_fields(self):
@@ -414,7 +417,7 @@ class CharacterTests(TestCase):
 
         response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertEqual(response.status_code, 404)
         self.assertFalse(CharacterMention.objects.exists())
 
     def test_cannot_create_mention_in_pending_deletion_project(self):
@@ -425,7 +428,7 @@ class CharacterTests(TestCase):
 
         response = self.client.post(self.mention_create_url(), self.mention_payload(character, node))
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(CharacterMention.objects.exists())
 
     def test_character_list_only_shows_current_project_characters(self):
@@ -440,7 +443,9 @@ class CharacterTests(TestCase):
 
     def test_image_upload_does_not_break_creation_or_editing(self):
         self.client.force_login(self.user)
-        image = SimpleUploadedFile("portrait.gif", b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02L\x01\x00;", content_type="image/gif")
+        image_bytes = BytesIO()
+        Image.new("RGB", (2, 2), "white").save(image_bytes, format="PNG")
+        image = SimpleUploadedFile("portrait.png", image_bytes.getvalue(), content_type="image/png")
 
         response = self.client.post(self.create_url(), self.character_payload(image=image))
 

@@ -1,9 +1,11 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from apps.manuscripts.models import ManuscriptNode
-from apps.projects.models import Project
+from apps.core.permissions import validate_project_action
+from apps.core.widgets import PrivateFileInput
 
 from .models import Character, CharacterDramaticRole, CharacterMention
 
@@ -57,6 +59,7 @@ class CharacterForm(forms.ModelForm):
             "completion_status": _("Estado de construcción"),
         }
         widgets = {
+            "image": PrivateFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
             "physical_description": forms.Textarea(attrs={"rows": 4}),
             "psychological_description": forms.Textarea(attrs={"rows": 4}),
             "biography": forms.Textarea(attrs={"rows": 5}),
@@ -86,13 +89,11 @@ class CharacterForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        if self.project and self.project.status in (
-            Project.ProjectStatus.DELETED,
-            Project.ProjectStatus.PENDING_DELETION,
-        ):
-            raise ValidationError(_("No se pueden crear o editar personajes en proyectos eliminados o pendientes de borrado."))
+        if self.project:
+            validate_project_action(self.project)
         return cleaned_data
 
+    @transaction.atomic
     def save(self, commit=True):
         character = super().save(commit=False)
         character.project = self.project
@@ -142,11 +143,8 @@ class CharacterMentionForm(forms.ModelForm):
         node = cleaned_data.get("node")
         mention_type = cleaned_data.get("mention_type")
 
-        if self.project and self.project.status in (
-            Project.ProjectStatus.DELETED,
-            Project.ProjectStatus.PENDING_DELETION,
-        ):
-            raise ValidationError(_("No se pueden gestionar menciones en proyectos eliminados o pendientes de borrado."))
+        if self.project:
+            validate_project_action(self.project)
 
         if character and self.project and character.project_id != self.project.id:
             raise ValidationError({"character": _("El personaje debe pertenecer al proyecto actual.")})

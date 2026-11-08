@@ -9,7 +9,7 @@ services:
       - .env
     volumes:
       - .:/code
-      - media_data:/code/media
+      - media_data:/code/private_media
       - static_data:/code/staticfiles
     ports:
       - "${DJANGO_PORT:-8000}:8000"
@@ -25,7 +25,7 @@ services:
       - .env
     volumes:
       - .:/code
-      - media_data:/code/media
+      - media_data:/code/private_media
     depends_on:
       - postgres
       - redis

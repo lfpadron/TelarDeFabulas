@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{{ note.title }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
     <h1>{{ note.title }}</h1>
     <p class="muted">{% trans "Proyecto" %}: {{ project.name }}</p>
@@ -11,7 +12,7 @@
     <p><strong>{% trans "Tipo" %}:</strong> {{ note.get_note_type_display }}</p>
     <p><strong>{% trans "Estado" %}:</strong> {{ note.get_status_display }}</p>
     <p><strong>{% trans "Prioridad" %}:</strong> {{ note.get_priority_display }}</p>
-    <p><strong>{% trans "Nodo relacionado" %}:</strong> {% if note.node %}{{ note.node.title }}{% else %}-{% endif %}</p>
+    <p><strong>{% trans "Nodo relacionado" %}:</strong> {% if note.node %}{{ note.node.display_title }}{% else %}-{% endif %}</p>
     <p><strong>{% trans "Personaje relacionado" %}:</strong> {% if note.character %}{{ note.character.name }}{% else %}-{% endif %}</p>
     <p><strong>{% trans "Creada" %}:</strong> {{ note.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>{% trans "Actualizada" %}:</strong> {{ note.updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
@@ -24,7 +25,7 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'notes:list' project.pk %}">{% trans "Volver a notas" %}</a>
-        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+        {% if access.edit %}
             <a class="button" href="{% url 'notes:edit' project.pk note.pk %}">{% trans "Editar" %}</a>
             <a class="button warning" href="{% url 'notes:delete' project.pk note.pk %}">{% trans "Borrar" %}</a>
         {% endif %}

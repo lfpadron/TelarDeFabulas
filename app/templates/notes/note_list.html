@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{% trans "Notas, ideas y pendientes" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
     <h1>{% trans "Notas, ideas y pendientes" %}: {{ project.name }}</h1>
 
-    {% if project.status == "PENDING_DELETION" or project.status == "DELETED" %}
+    {% if not access.edit %}
         <p class="warning-note">
             {% trans "Este proyecto no permite crear o editar notas por su estado actual." %}
         </p>
@@ -15,7 +16,7 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
-        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+        {% if access.create %}
             <a class="button" href="{% url 'notes:create' project.pk %}">{% trans "Crear nota" %}</a>
         {% endif %}
     </div>
@@ -76,13 +77,13 @@
                             <td>{{ note.title }}</td>
                             <td>{{ note.get_status_display }}</td>
                             <td>{{ note.get_priority_display }}</td>
-                            <td>{% if note.node %}{{ note.node.title }}{% else %}-{% endif %}</td>
+                            <td>{% if note.node %}{{ note.node.display_title }}{% else %}-{% endif %}</td>
                             <td>{% if note.character %}{{ note.character.name }}{% else %}-{% endif %}</td>
                             <td>{{ note.updated_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                             <td>
                                 <div class="actions">
                                     <a href="{% url 'notes:detail' project.pk note.pk %}">{% trans "ver" %}</a>
-                                    {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+                                    {% if access.edit %}
                                         <a href="{% url 'notes:edit' project.pk note.pk %}">{% trans "editar" %}</a>
                                         <a href="{% url 'notes:delete' project.pk note.pk %}">{% trans "borrar" %}</a>
                                     {% endif %}

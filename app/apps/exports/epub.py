@@ -7,16 +7,7 @@ from ebooklib import epub
 
 from apps.manuscripts.models import ManuscriptNode
 
-from .services import css_font_name, css_number, ordered_export_nodes, render_content_blocks
-
-
-HEADING_TAGS = {
-    ManuscriptNode.NodeType.BOOK: "h1",
-    ManuscriptNode.NodeType.PART: "h2",
-    ManuscriptNode.NodeType.CHAPTER: "h2",
-    ManuscriptNode.NodeType.SCENE: "h3",
-    ManuscriptNode.NodeType.FRAGMENT: "h4",
-}
+from .services import css_alignment, css_font_name, css_number, heading_level, ordered_export_nodes, render_content_blocks
 
 
 def creator_for_user(user):
@@ -25,7 +16,7 @@ def creator_for_user(user):
 
 def epub_title(export_job):
     if export_job.root_node_id:
-        return export_job.root_node.title
+        return export_job.root_node.display_title
     return export_job.project.name
 
 
@@ -34,7 +25,7 @@ def epub_language(project):
 
 
 def build_epub_css(style):
-    text_alignment = style.text_alignment.lower().replace("_", "-")
+    text_alignment = css_alignment(style)
     fallback_family = "serif" if style.font_category == style.FontCategory.SERIF else "sans-serif"
     return f"""
 body {{
@@ -63,15 +54,15 @@ p {{
 
 
 def render_epub_node(node, style_template):
-    tag = HEADING_TAGS.get(node.node_type, "h2")
+    tag = f"h{heading_level(node)}"
     content_html = render_content_blocks(node.content)
     separator = ""
     if node.node_type == ManuscriptNode.NodeType.SCENE and style_template.scene_separator:
         separator = f'<div class="scene-separator">{escape(style_template.scene_separator)}</div>'
 
     return f"""
-<section id="node-{node.id}" class="node node-{node.node_type.lower()}">
-  <{tag}>{escape(node.title)}</{tag}>
+<section id="node-{node.id}" class="node node-{escape(node.node_type.lower())}">
+  <{tag}>{escape(node.display_title)}</{tag}>
   {content_html}
   {separator}
 </section>
@@ -81,7 +72,7 @@ def render_epub_node(node, style_template):
 def build_chapter_content(export_job, node):
     return f"""<html>
   <head>
-    <title>{escape(node.title)}</title>
+    <title>{escape(node.display_title)}</title>
   </head>
   <body>
     {render_epub_node(node, export_job.style_template)}
@@ -115,7 +106,7 @@ def build_export_epub(export_job):
     chapters = []
     for node in nodes:
         chapter = epub.EpubHtml(
-            title=node.title,
+            title=node.display_title,
             file_name=f"node-{node.id}.xhtml",
             lang=language,
             uid=f"node-{node.id}",

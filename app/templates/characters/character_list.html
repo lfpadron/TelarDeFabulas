@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{% trans "Personajes" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
     <h1>{% trans "Personajes" %}: {{ project.name }}</h1>
 
-    {% if project.status == "PENDING_DELETION" or project.status == "DELETED" %}
+    {% if not access.edit %}
         <p class="warning-note">
             {% trans "Este proyecto no permite crear o editar personajes por su estado actual." %}
         </p>
@@ -15,7 +16,7 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
-        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+        {% if access.create %}
             <a class="button" href="{% url 'characters:create' project.pk %}">{% trans "Crear personaje" %}</a>
         {% endif %}
     </div>
@@ -56,7 +57,7 @@
                             <td>
                                 <div class="actions">
                                     <a href="{% url 'characters:detail' project.pk character.pk %}">{% trans "ver" %}</a>
-                                    {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+                                    {% if access.edit %}
                                         <a href="{% url 'characters:edit' project.pk character.pk %}">{% trans "editar" %}</a>
                                         <a href="{% url 'characters:delete' project.pk character.pk %}">{% trans "borrar" %}</a>
                                     {% endif %}

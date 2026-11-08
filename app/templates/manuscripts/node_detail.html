@@ -1,11 +1,15 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
-{% block title %}{{ node.title }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
+{% block title %}{{ node.display_title }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
-    <h1>{{ node.title }}</h1>
+    <h1>{{ node.display_title }}</h1>
+    <p class="muted">{% trans "ID" %}: {{ node.pk }}</p>
+    {% if not node_access.editable %}<p class="warning-note">{% trans "Legado: solo lectura. Pendiente de revision estructural." %}</p>{% endif %}
+    {% if node.short_description %}<p>{{ node.short_description|linebreaksbr }}</p>{% endif %}
     <p class="muted">{% trans "Proyecto" %}: {{ project.name }}</p>
 
     <p><strong>{% trans "Tipo" %}:</strong> {{ node.get_node_type_display }}</p>
@@ -16,8 +20,8 @@
         <strong>{% trans "Publicable" %}:</strong>
         {% if node.is_publishable %}{% trans "Sí" %}{% else %}{% trans "No" %}{% endif %}
     </p>
-    {% if node.parent %}
-        <p><strong>{% trans "Padre" %}:</strong> {{ node.parent.title }}</p>
+    {% if parent %}
+        <p><strong>{% trans "Padre" %}:</strong> <a href="{% url 'manuscripts:detail' project.pk parent.pk %}">{{ parent.display_title }}</a></p>
     {% endif %}
 
     {% if node.content %}
@@ -67,10 +71,26 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'manuscripts:tree' project.pk %}">{% trans "Volver al manuscrito" %}</a>
-        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+        {% if access.edit and node_access.editable %}
+            {% if node_access.can_create_child %}<a class="button" href="{% url 'manuscripts:create' project.pk %}?parent={{ node.pk }}">{% trans "Crear hijo" %}</a>{% endif %}
             <a class="button" href="{% url 'manuscripts:edit' project.pk node.pk %}">{% trans "Editar" %}</a>
+            {% if node_access.can_move %}<a class="button" href="{% url 'manuscripts:move' project.pk node.pk %}?next={{ request.get_full_path|urlencode }}">{% trans "Mover" %}</a>{% endif %}
+            {% if node_access.can_move_up %}
+                <form class="inline-form" method="post" action="{% url 'manuscripts:move_up' project.pk node.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="button secondary" type="submit">{% trans "Subir" %}</button>
+                </form>
+            {% endif %}
+            {% if node_access.can_move_down %}
+                <form class="inline-form" method="post" action="{% url 'manuscripts:move_down' project.pk node.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="button secondary" type="submit">{% trans "Bajar" %}</button>
+                </form>
+            {% endif %}
             <a class="button" href="{% url 'notes:create' project.pk %}?node={{ node.pk }}">{% trans "Crear nota" %}</a>
-            <a class="button warning" href="{% url 'manuscripts:delete' project.pk node.pk %}">{% trans "Borrar" %}</a>
+            {% if node_access.can_delete %}<a class="button warning" href="{% url 'manuscripts:delete' project.pk node.pk %}">{% trans "Borrar" %}</a>{% endif %}
         {% endif %}
     </div>
 </section>

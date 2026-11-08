@@ -1,23 +1,15 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, ProtectedError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 
-from apps.accounts.models import User
+from apps.core.permissions import user_can_manage_personal_styles
 
 from .forms import StyleTemplateForm
 from .models import StyleTemplate
-
-
-def user_can_manage_personal_styles(user):
-    return getattr(user, "user_type", None) in (
-        User.UserType.PREMIUM,
-        User.UserType.BUSINESS_ADMIN,
-        User.UserType.TECH_ADMIN,
-    )
 
 
 def visible_styles_for_user(user):
@@ -83,18 +75,17 @@ def style_detail(request, style_pk):
             "style": style,
             "can_edit_style": user_can_manage_personal_styles(request.user) and style.user_id == request.user.id and not style.is_system,
             "can_duplicate_style": user_can_manage_personal_styles(request.user),
-            "can_delete_style": style.user_id == request.user.id and not style.is_system,
+            "can_delete_style": user_can_manage_personal_styles(request.user) and style.user_id == request.user.id and not style.is_system,
         },
     )
 
 
 @login_required
 def style_edit(request, style_pk):
+    style = get_owned_personal_style(request.user, style_pk)
     if not user_can_manage_personal_styles(request.user):
         messages.error(request, _("Tu cuenta actual no puede editar estilos personalizados."))
         return redirect("styles:list")
-
-    style = get_owned_personal_style(request.user, style_pk)
 
     if request.method == "POST":
         form = StyleTemplateForm(request.POST, instance=style, user=request.user)
@@ -123,11 +114,11 @@ def style_edit(request, style_pk):
 @login_required
 @require_POST
 def style_duplicate(request, style_pk):
+    source = get_visible_style(request.user, style_pk)
     if not user_can_manage_personal_styles(request.user):
         messages.error(request, _("Tu cuenta actual no puede duplicar estilos."))
         return redirect("styles:list")
 
-    source = get_visible_style(request.user, style_pk)
     duplicate = StyleTemplate.objects.create(
         user=request.user,
         name=_("Copia de %(name)s") % {"name": source.name},
@@ -163,9 +154,16 @@ def style_delete(request, style_pk):
         return redirect("styles:detail", style_pk=style.pk)
     if style.user_id != request.user.id:
         raise Http404(_("No puedes borrar estilos ajenos."))
+    if not user_can_manage_personal_styles(request.user):
+        messages.error(request, _("Tu cuenta actual no puede borrar estilos personalizados."))
+        return redirect("styles:detail", style_pk=style.pk)
 
     if request.method == "POST":
-        style.delete()
+        try:
+            style.delete()
+        except ProtectedError:
+            messages.error(request, _("Este estilo está en uso por una exportación y no puede borrarse."))
+            return redirect("styles:detail", style_pk=style.pk)
         messages.success(request, _("Estilo borrado correctamente."))
         return redirect("styles:list")
 

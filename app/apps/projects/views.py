@@ -1,22 +1,20 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import Http404
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
+
+from apps.core.decorators import project_access
+from apps.core.permissions import Action, visible_projects
 
 from .forms import ProjectForm
 from .models import Project
 
 
-def get_user_project(user, pk):
-    return get_object_or_404(Project, pk=pk, user=user)
-
-
 @login_required
 def project_list(request):
-    projects = Project.objects.filter(user=request.user)
+    projects = visible_projects(request.user)
     return render(request, "projects/project_list.html", {"projects": projects})
 
 
@@ -43,16 +41,16 @@ def project_create(request):
 
 
 @login_required
+@project_access(key="pk")
 def project_detail(request, pk):
-    project = get_user_project(request.user, pk)
+    project = request.project
     return render(request, "projects/project_detail.html", {"project": project})
 
 
 @login_required
+@project_access(Action.EDIT, key="pk")
 def project_edit(request, pk):
-    project = get_user_project(request.user, pk)
-    if project.status == Project.ProjectStatus.DELETED:
-        raise Http404(_("No se puede editar un proyecto eliminado."))
+    project = request.project
 
     if request.method == "POST":
         form = ProjectForm(request.POST, instance=project, user=request.user)
@@ -76,14 +74,9 @@ def project_edit(request, pk):
 
 
 @login_required
+@project_access(Action.DELETE, key="pk")
 def project_delete(request, pk):
-    project = get_user_project(request.user, pk)
-    if project.status == Project.ProjectStatus.DELETED:
-        raise Http404(_("No se puede marcar para borrar un proyecto eliminado."))
-
-    if project.status == Project.ProjectStatus.PENDING_DELETION:
-        messages.warning(request, _("El proyecto ya está pendiente de borrado."))
-        return redirect("projects:detail", pk=project.pk)
+    project = request.project
 
     if request.method == "POST":
         try:
@@ -102,10 +95,9 @@ def project_delete(request, pk):
 
 @login_required
 @require_POST
+@project_access(Action.RESTORE, key="pk")
 def project_restore(request, pk):
-    project = get_user_project(request.user, pk)
-    if project.status == Project.ProjectStatus.DELETED:
-        raise Http404(_("No se puede restaurar un proyecto eliminado."))
+    project = request.project
 
     project.restore()
     messages.success(request, _("Proyecto restaurado correctamente."))

@@ -69,9 +69,15 @@ class ExportJobTests(TestCase):
             title="Escena secreta",
             content="Texto de la escena.",
         )
-        self.other_scene = ManuscriptNode.objects.create(
+        self.other_chapter = ManuscriptNode.objects.create(
             project=self.project,
             parent=self.book,
+            node_type=ManuscriptNode.NodeType.CHAPTER,
+            title="Otro capítulo",
+        )
+        self.other_scene = ManuscriptNode.objects.create(
+            project=self.project,
+            parent=self.other_chapter,
             node_type=ManuscriptNode.NodeType.SCENE,
             title="Escena fuera del capítulo",
             content="Texto fuera.",
@@ -452,7 +458,7 @@ class ExportJobTests(TestCase):
         self.assertContains(response, "uno dos tres...")
         self.assertNotContains(response, "cuatro")
 
-    def test_preview_redirects_for_pending_deletion_project(self):
+    def test_preview_allows_pending_deletion_project(self):
         pending_project = Project.objects.create(
             user=self.premium_user,
             name="Proyecto pendiente preview",
@@ -463,7 +469,8 @@ class ExportJobTests(TestCase):
 
         response = self.client.get(self.preview_url(pending_project), self.preview_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": pending_project.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.context["preview_result"])
 
     def test_create_export_starts_as_pending(self):
         self.client.force_login(self.premium_user)
@@ -874,10 +881,10 @@ class ExportJobTests(TestCase):
 
         response = self.client.post(self.create_url(deleted_project), self.export_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": deleted_project.pk}))
+        self.assertEqual(response.status_code, 404)
         self.assertFalse(ExportJob.objects.filter(project=deleted_project).exists())
 
-    def test_pending_deletion_project_cannot_be_exported(self):
+    def test_pending_deletion_project_can_be_exported(self):
         pending_project = Project.objects.create(
             user=self.premium_user,
             name="Proyecto pendiente",
@@ -886,7 +893,9 @@ class ExportJobTests(TestCase):
         )
         self.client.force_login(self.premium_user)
 
-        response = self.client.post(self.create_url(pending_project), self.export_payload())
+        with patch("apps.exports.views.generate_export_job.delay") as delay:
+            response = self.client.post(self.create_url(pending_project), self.export_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": pending_project.pk}))
-        self.assertFalse(ExportJob.objects.filter(project=pending_project).exists())
+        job = ExportJob.objects.get(project=pending_project)
+        self.assertRedirects(response, self.detail_url(job))
+        delay.assert_called_once_with(job.pk)

@@ -7,7 +7,7 @@
 <section class="panel">
     <h1>{% trans "Borrar nodo" %}</h1>
     <p class="warning-note">
-        {% blocktrans with title=node.title %}
+        {% blocktrans with title=node.display_title %}
             Vas a borrar físicamente el nodo "{{ title }}". Esta acción no borra proyectos ni otros nodos.
         {% endblocktrans %}
     </p>

@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from apps.manuscripts.models import ManuscriptNode
-from apps.projects.models import Project
+from apps.core.permissions import Action, can_export_project, validate_project_action
 from apps.styles.models import StyleTemplate
 
 from .models import ExportJob
@@ -56,11 +56,10 @@ class ExportJobForm(forms.ModelForm):
         root_node = cleaned_data.get("root_node")
         style_template = cleaned_data.get("style_template")
 
-        if self.project and self.project.status == Project.ProjectStatus.DELETED:
-            raise ValidationError(_("No se puede exportar un proyecto eliminado."))
-
-        if self.project and self.project.status == Project.ProjectStatus.PENDING_DELETION:
-            raise ValidationError(_("No se puede exportar un proyecto pendiente de borrado."))
+        if self.project:
+            validate_project_action(self.project, Action.EXPORT)
+            if self.user and not can_export_project(self.user, self.project):
+                raise ValidationError(_("Solo puedes exportar proyectos propios."))
 
         if root_node and self.project and root_node.project_id != self.project.id:
             raise ValidationError({"root_node": _("El nodo raíz debe pertenecer al mismo proyecto.")})
@@ -112,11 +111,10 @@ class ExportPreviewForm(forms.Form):
         root_node = cleaned_data.get("root_node")
         style_template = cleaned_data.get("style_template")
 
-        if self.project and self.project.status == Project.ProjectStatus.DELETED:
-            raise ValidationError(_("No se puede previsualizar un proyecto eliminado."))
-
-        if self.project and self.project.status == Project.ProjectStatus.PENDING_DELETION:
-            raise ValidationError(_("No se puede previsualizar un proyecto pendiente de borrado."))
+        if self.project:
+            validate_project_action(self.project, Action.EXPORT)
+            if self.user and not can_export_project(self.user, self.project):
+                raise ValidationError(_("Solo puedes previsualizar proyectos propios."))
 
         if root_node and self.project and root_node.project_id != self.project.id:
             raise ValidationError({"root_node": _("El nodo raíz debe pertenecer al mismo proyecto.")})

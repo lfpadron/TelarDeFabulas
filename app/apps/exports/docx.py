@@ -7,16 +7,8 @@ from django.utils.translation import gettext as _
 
 from apps.manuscripts.models import ManuscriptNode
 
-from .services import ordered_export_nodes
+from .services import heading_level, ordered_export_nodes
 
-
-HEADING_LEVELS = {
-    ManuscriptNode.NodeType.BOOK: 1,
-    ManuscriptNode.NodeType.PART: 2,
-    ManuscriptNode.NodeType.CHAPTER: 2,
-    ManuscriptNode.NodeType.SCENE: 3,
-    ManuscriptNode.NodeType.FRAGMENT: 4,
-}
 
 ALIGNMENTS = {
     "LEFT": WD_ALIGN_PARAGRAPH.LEFT,
@@ -43,7 +35,7 @@ def apply_document_styles(document, style_template):
     normal.paragraph_format.first_line_indent = Mm(as_float(style_template.first_line_indent))
     normal.paragraph_format.alignment = ALIGNMENTS.get(style_template.text_alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
 
-    for level in range(1, 5):
+    for level in range(1, 7):
         heading = document.styles[f"Heading {level}"]
         heading.font.name = style_template.font_heading
         heading.font.size = Pt(as_float(style_template.heading_size))
@@ -73,18 +65,17 @@ def add_table_of_contents(document, nodes):
 
     document.add_heading(_("Índice"), level=1)
     for node in nodes:
-        level = HEADING_LEVELS.get(node.node_type, 2)
+        level = heading_level(node)
         indent = Mm((level - 1) * 6)
         paragraph = document.add_paragraph(style="Normal")
         paragraph.paragraph_format.left_indent = indent
         paragraph.paragraph_format.first_line_indent = Mm(0)
-        paragraph.add_run(node.title)
+        paragraph.add_run(node.display_title)
     document.add_page_break()
 
 
 def add_node(document, node, style_template):
-    heading_level = HEADING_LEVELS.get(node.node_type, 2)
-    heading = document.add_heading(node.title, level=heading_level)
+    heading = document.add_heading(node.display_title, level=heading_level(node))
     for run in heading.runs:
         run.font.name = style_template.font_heading
         run.font.size = Pt(as_float(style_template.heading_size))

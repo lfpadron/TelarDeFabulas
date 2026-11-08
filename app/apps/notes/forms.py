@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.characters.models import Character
 from apps.manuscripts.models import ManuscriptNode
-from apps.projects.models import Project
+from apps.core.permissions import validate_project_action
 
 from .models import Note
 
@@ -43,11 +43,8 @@ class NoteForm(forms.ModelForm):
         cleaned_data = super().clean()
         node = cleaned_data.get("node")
         character = cleaned_data.get("character")
-        if self.project and self.project.status in (
-            Project.ProjectStatus.DELETED,
-            Project.ProjectStatus.PENDING_DELETION,
-        ):
-            raise ValidationError(_("No se pueden crear o editar notas en proyectos eliminados o pendientes de borrado."))
+        if self.project:
+            validate_project_action(self.project)
         if node and node.project_id != self.project.id:
             raise ValidationError({"node": _("El nodo debe pertenecer al mismo proyecto que la nota.")})
         if character and character.project_id != self.project.id:

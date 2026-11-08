@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{% trans "Proyectos" %} | {% trans "Telar de Fábulas" %}{% endblock %}
 
@@ -24,6 +24,7 @@
                 </thead>
                 <tbody>
                     {% for project in projects %}
+                        {% project_permissions project as access %}
                         <tr>
                             <td>{{ project.name }}</td>
                             <td>{{ project.get_language_display }} / {{ project.get_locale_display }}</td>
@@ -32,13 +33,13 @@
                             <td>
                                 <div class="actions">
                                     <a href="{% url 'projects:detail' project.pk %}">{% trans "ver" %}</a>
-                                    {% if project.status != "DELETED" %}
+                                    {% if access.edit %}
                                         <a href="{% url 'projects:edit' project.pk %}">{% trans "editar" %}</a>
                                     {% endif %}
-                                    {% if project.status == "ACTIVE" or project.status == "FROZEN" %}
+                                    {% if access.delete %}
                                         <a href="{% url 'projects:delete' project.pk %}">{% trans "marcar para borrar" %}</a>
                                     {% endif %}
-                                    {% if project.status == "FROZEN" or project.status == "PENDING_DELETION" %}
+                                    {% if access.restore %}
                                         <form class="inline-form" method="post" action="{% url 'projects:restore' project.pk %}">
                                             {% csrf_token %}
                                             <button type="submit">{% trans "restaurar" %}</button>

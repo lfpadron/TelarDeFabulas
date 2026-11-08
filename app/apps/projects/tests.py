@@ -127,7 +127,7 @@ class ProjectViewTests(TestCase):
 
         response = self.client.post(reverse("projects:delete", kwargs={"pk": project.pk}))
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": project.pk}))
+        self.assertEqual(response.status_code, 403)
         project.refresh_from_db()
         self.assertEqual(project.scheduled_deletion_at, original_scheduled_deletion_at)
 

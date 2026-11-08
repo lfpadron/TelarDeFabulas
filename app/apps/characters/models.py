@@ -2,12 +2,14 @@ import uuid
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.manuscripts.models import ManuscriptNode
 from apps.projects.models import Project
+from apps.core.permissions import validate_project_action
+
+from .validators import validate_character_image
 
 
 def character_image_upload_to(instance, filename):
@@ -48,12 +50,7 @@ class Character(models.Model):
         _("imagen"),
         upload_to=character_image_upload_to,
         blank=True,
-        validators=[
-            FileExtensionValidator(
-                allowed_extensions=["jpg", "jpeg", "png", "gif", "webp"],
-                message=_("Sube una imagen JPG, JPEG, PNG, GIF o WEBP."),
-            )
-        ],
+        validators=[validate_character_image],
     )
     importance = models.CharField(
         _("importancia"),
@@ -135,11 +132,8 @@ class Character(models.Model):
 
     def clean(self):
         super().clean()
-        if self.project_id and self.project.status in (
-            Project.ProjectStatus.DELETED,
-            Project.ProjectStatus.PENDING_DELETION,
-        ):
-            raise ValidationError(_("No se pueden crear o editar personajes en proyectos eliminados o pendientes de borrado."))
+        if self.project_id:
+            validate_project_action(self.project)
         if self.narrative_role != self.NarrativeRole.OTRO:
             self.custom_narrative_role = ""
 
@@ -187,6 +181,8 @@ class CharacterDramaticRole(models.Model):
 
     def clean(self):
         super().clean()
+        if self.character_id:
+            validate_project_action(self.character.project)
         if self.role != self.DramaticRole.OTRO:
             self.custom_role = ""
 
@@ -229,6 +225,8 @@ class CharacterMention(models.Model):
 
     def clean(self):
         super().clean()
+        if self.character_id:
+            validate_project_action(self.character.project)
         if self.character_id and self.node_id and self.character.project_id != self.node.project_id:
             raise ValidationError(_("El personaje y el nodo deben pertenecer al mismo proyecto."))
         if self.character_id and self.node_id and self.mention_type:

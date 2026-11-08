@@ -28,7 +28,7 @@ COPY pyproject.toml uv.lock /code/
 RUN uv sync --locked --no-dev --no-install-project
 
 COPY . /code/
-RUN mkdir -p /code/media /code/staticfiles \
+RUN mkdir -p /code/private_media /code/staticfiles \
     && adduser --disabled-password --gecos "" appuser \
     && chown -R appuser:appuser /code
 

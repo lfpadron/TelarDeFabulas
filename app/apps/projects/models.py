@@ -1,10 +1,11 @@
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from apps.core.permissions import Action, validate_project_action
 
 
 class Project(models.Model):
@@ -103,10 +104,7 @@ class Project(models.Model):
         return _("Tu cuenta no tiene límite de proyectos en esta fase.")
 
     def mark_for_deletion(self):
-        if self.status == self.ProjectStatus.DELETED:
-            raise ValidationError(_("No se puede marcar para borrar un proyecto eliminado."))
-        if self.status == self.ProjectStatus.PENDING_DELETION:
-            raise ValidationError(_("El proyecto ya está pendiente de borrado."))
+        validate_project_action(self, Action.DELETE)
 
         now = timezone.now()
         self.status = self.ProjectStatus.PENDING_DELETION
@@ -115,8 +113,7 @@ class Project(models.Model):
         self.save(update_fields=["status", "deletion_requested_at", "scheduled_deletion_at", "updated_at"])
 
     def restore(self):
-        if self.status == self.ProjectStatus.DELETED:
-            raise ValidationError(_("No se puede restaurar un proyecto eliminado."))
+        validate_project_action(self, Action.RESTORE)
 
         self.status = self.ProjectStatus.ACTIVE
         self.frozen_at = None

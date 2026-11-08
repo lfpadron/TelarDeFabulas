@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{% trans "Manuscrito" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
     <h1>{% trans "Manuscrito" %}: {{ project.name }}</h1>
 
-    {% if project.status == "PENDING_DELETION" or project.status == "DELETED" %}
+    {% if not access.edit %}
         <p class="warning-note">
             {% trans "Este proyecto no permite crear o editar nodos de manuscrito por su estado actual." %}
         </p>
@@ -17,8 +18,8 @@
         <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
         <a class="button secondary" href="{% url 'exports:preview' project.pk %}">{% trans "Previsualizar HTML" %}</a>
         <a class="button" href="{% url 'exports:create' project.pk %}">{% trans "Exportar manuscrito" %}</a>
-        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
-            <a class="button" href="{% url 'manuscripts:create' project.pk %}">{% trans "Crear nodo" %}</a>
+        {% if access.create and can_create_book %}
+            <a class="button" href="{% url 'manuscripts:create' project.pk %}">{% trans "Crear libro" %}</a>
         {% endif %}
     </div>
 
@@ -40,7 +41,9 @@
                         <tr>
                             <td>
                                 <span style="display:inline-block; margin-left: {{ row.indent }}px;">
-                                    {{ row.node.title }}
+                                    {{ row.node.display_title }}
+                                    {% if row.node.short_description %}<small class="muted">{{ row.node.short_description|truncatechars:80 }}</small>{% endif %}
+                                    {% if not row.editable %}<small class="muted">{% trans "Legado: solo lectura" %}</small>{% endif %}
                                 </span>
                             </td>
                             <td>{{ row.node.get_node_type_display }}</td>
@@ -55,10 +58,26 @@
                             </td>
                             <td>
                                 <div class="actions">
-                                    <a href="{% url 'manuscripts:detail' project.pk row.node.pk %}">{% trans "ver" %}</a>
-                                    {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
-                                        <a href="{% url 'manuscripts:edit' project.pk row.node.pk %}">{% trans "editar" %}</a>
-                                        <a href="{% url 'manuscripts:delete' project.pk row.node.pk %}">{% trans "borrar" %}</a>
+                                    <a href="{% url 'manuscripts:detail' project.pk row.node.pk %}">{% trans "Ver" %}</a>
+                                    {% if access.edit and row.editable %}
+                                        {% if row.can_create_child %}<a href="{% url 'manuscripts:create' project.pk %}?parent={{ row.node.pk }}">{% trans "Crear hijo" %}</a>{% endif %}
+                                        <a href="{% url 'manuscripts:edit' project.pk row.node.pk %}">{% trans "Editar" %}</a>
+                                        {% if row.can_move %}<a href="{% url 'manuscripts:move' project.pk row.node.pk %}?next={{ request.get_full_path|urlencode }}">{% trans "Mover" %}</a>{% endif %}
+                                        {% if row.can_move_up %}
+                                            <form class="inline-form" method="post" action="{% url 'manuscripts:move_up' project.pk row.node.pk %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <button type="submit">{% trans "Subir" %}</button>
+                                            </form>
+                                        {% endif %}
+                                        {% if row.can_move_down %}
+                                            <form class="inline-form" method="post" action="{% url 'manuscripts:move_down' project.pk row.node.pk %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <button type="submit">{% trans "Bajar" %}</button>
+                                            </form>
+                                        {% endif %}
+                                        {% if row.can_delete %}<a href="{% url 'manuscripts:delete' project.pk row.node.pk %}">{% trans "Borrar" %}</a>{% endif %}
                                     {% endif %}
                                 </div>
                             </td>

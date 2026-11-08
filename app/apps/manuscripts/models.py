@@ -6,6 +6,9 @@ from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
 
 from apps.projects.models import Project
+from apps.core.permissions import validate_project_action
+
+from .hierarchy import validate_node_hierarchy
 
 
 WORD_RE = re.compile(r"\b[\wáéíóúÁÉÍÓÚñÑüÜ]+(?:[-'][\wáéíóúÁÉÍÓÚñÑüÜ]+)?\b", re.UNICODE)
@@ -54,7 +57,8 @@ class ManuscriptNode(models.Model):
         choices=NodeType.choices,
         default=NodeType.BOOK,
     )
-    title = models.CharField(_("título"), max_length=220)
+    title = models.CharField(_("título"), max_length=220, blank=True)
+    short_description = models.TextField(_("descripción breve"), blank=True, default="")
     content = models.TextField(_("contenido"), blank=True)
     status = models.CharField(
         _("estado"),
@@ -79,7 +83,25 @@ class ManuscriptNode(models.Model):
         ]
 
     def __str__(self):
-        return self.title
+        return self.display_title
+
+    @property
+    def display_title(self):
+        if self.title.strip():
+            return self.title
+        return _("%(type)s %(number)s") % {"type": self.get_node_type_display(), "number": self.position or self.pk or 1}
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_structure = {name: instance.__dict__[name] for name in
+                                      ("project_id", "parent_id", "node_type", "position") if name in instance.__dict__}
+        return instance
+
+    def refresh_from_db(self, *args, **kwargs):
+        super().refresh_from_db(*args, **kwargs)
+        self._loaded_structure = {name: self.__dict__[name] for name in
+                                  ("project_id", "parent_id", "node_type", "position") if name in self.__dict__}
 
     def descendant_ids(self):
         if not self.pk:
@@ -89,7 +111,7 @@ class ManuscriptNode(models.Model):
         pending = [self.pk]
         while pending:
             child_ids = list(
-                self.__class__.objects.filter(parent_id__in=pending)
+                self.__class__.objects.filter(project_id=self.project_id, parent_id__in=pending)
                 .exclude(pk__in=seen)
                 .values_list("pk", flat=True)
             )
@@ -99,18 +121,14 @@ class ManuscriptNode(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk and not self._state.adding:
+            old_project = type(self).objects.filter(pk=self.pk).values_list("project_id", flat=True).first()
+            if old_project != self.project_id:
+                raise ValidationError({"project": _("No se permite trasladar nodos a otro proyecto.")})
         project = self.project if self.project_id else None
-        if project and project.status in (
-            Project.ProjectStatus.DELETED,
-            Project.ProjectStatus.PENDING_DELETION,
-        ):
-            raise ValidationError(_("No se pueden crear o editar nodos en proyectos eliminados o pendientes de borrado."))
-        if self.parent_id and self.pk and self.parent_id == self.pk:
-            raise ValidationError({"parent": _("Un nodo no puede ser su propio padre.")})
-        if self.parent_id and self.parent_id in self.descendant_ids():
-            raise ValidationError({"parent": _("Un nodo no puede tener como padre a uno de sus descendientes.")})
-        if self.parent and self.parent.project_id != self.project_id:
-            raise ValidationError({"parent": _("El nodo padre debe pertenecer al mismo proyecto.")})
+        if project:
+            validate_project_action(project)
+        validate_node_hierarchy(self)
         if self.position is not None and self.position < 1:
             raise ValidationError({"position": _("La posición debe ser un entero positivo.")})
 
@@ -127,11 +145,14 @@ class ManuscriptNode(models.Model):
         self.position = self.next_position(self.project, self.parent)
 
     def save(self, *args, **kwargs):
-        if not self.position:
-            self.assign_next_position()
-        self.word_count = count_words(self.content)
-        self.full_clean()
-        return super().save(*args, **kwargs)
+        from .services import save_node
+
+        return save_node(self, *args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        from .services import delete_node
+
+        return delete_node(self, using=using, keep_parents=keep_parents)
 
     def can_delete_safely(self):
         return not self.children.exists()

@@ -30,6 +30,10 @@ class CustomUserAdmin(UserAdmin):
     ordering = ("email",)
     readonly_fields = ("last_login", "created_at", "updated_at")
 
+    def has_delete_permission(self, request, obj=None):
+        # Physical deletion would cascade into private projects outside their retention workflow.
+        return False
+
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         (

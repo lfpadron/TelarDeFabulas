@@ -124,7 +124,7 @@ class NoteTests(TestCase):
 
         response = self.client.post(self.create_url(), self.note_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertEqual(response.status_code, 404)
         self.assertFalse(Note.objects.filter(project=self.project).exists())
 
     def test_cannot_create_note_in_pending_deletion_project(self):
@@ -133,7 +133,7 @@ class NoteTests(TestCase):
 
         response = self.client.post(self.create_url(), self.note_payload())
 
-        self.assertRedirects(response, reverse("projects:detail", kwargs={"pk": self.project.pk}))
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(Note.objects.filter(project=self.project).exists())
 
     def test_done_status_fills_completed_at(self):

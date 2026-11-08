@@ -1,21 +1,22 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.http import require_safe
 
 from apps.manuscripts.models import ManuscriptNode
-from apps.projects.models import Project
+from apps.core.decorators import project_access
+from apps.core.files import open_private_file, private_file_response
+from apps.core.permissions import Action, can_edit_project, local_project_relations
 
 from .forms import CharacterForm, CharacterMentionForm
 from .models import Character, CharacterMention
-
-
-def get_user_project(user, project_pk):
-    return get_object_or_404(Project, pk=project_pk, user=user)
+from .validators import IMAGE_CONTENT_TYPES, verified_image_format
 
 
 def get_project_character(project, character_pk):
@@ -29,10 +30,6 @@ def get_project_mention(project, mention_pk):
         character__project=project,
         node__project=project,
     )
-
-
-def project_allows_character_changes(project):
-    return project.status not in (Project.ProjectStatus.DELETED, Project.ProjectStatus.PENDING_DELETION)
 
 
 def get_reference_for_project(model, project, raw_pk, error_message):
@@ -70,15 +67,16 @@ def mention_return_url(request, project, mention=None, initial_character=None, i
 
 
 @login_required
+@project_access()
 def character_list(request, project_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     characters = (
         Character.objects.filter(project=project)
         .annotate(
-            mention_count=Count("mentions", distinct=True),
+            mention_count=Count("mentions", filter=Q(mentions__node__project=project), distinct=True),
             appearance_count=Count(
                 "mentions",
-                filter=Q(mentions__mention_type=CharacterMention.MentionType.APPEARS),
+                filter=Q(mentions__mention_type=CharacterMention.MentionType.APPEARS, mentions__node__project=project),
                 distinct=True,
             ),
         )
@@ -89,11 +87,9 @@ def character_list(request, project_pk):
 
 
 @login_required
+@project_access(Action.CREATE)
 def character_create(request, project_pk):
-    project = get_user_project(request.user, project_pk)
-    if not project_allows_character_changes(project):
-        messages.error(request, _("No se pueden crear personajes en proyectos eliminados o pendientes de borrado."))
-        return redirect("projects:detail", pk=project.pk)
+    project = request.project
 
     if request.method == "POST":
         form = CharacterForm(request.POST, request.FILES, project=project)
@@ -117,11 +113,12 @@ def character_create(request, project_pk):
 
 
 @login_required
+@project_access()
 def character_detail(request, project_pk, character_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     character = get_project_character(project, character_pk)
-    linked_notes = character.work_notes.select_related("node").order_by("-updated_at", "title")
-    character_mentions = character.mentions.select_related("node").order_by(
+    linked_notes = local_project_relations(character.work_notes.filter(project=project)).select_related("node").order_by("-updated_at", "title")
+    character_mentions = character.mentions.filter(node__project=project).select_related("node").order_by(
         "node__parent_id",
         "node__position",
         "node__title",
@@ -134,18 +131,17 @@ def character_detail(request, project_pk, character_pk):
             "project": project,
             "character": character,
             "character_mentions": character_mentions,
-            "can_manage_mentions": project_allows_character_changes(project),
+            "can_manage_mentions": can_edit_project(request.user, project),
             "linked_notes": linked_notes,
         },
     )
 
 
 @login_required
+@project_access(Action.EDIT)
 def character_edit(request, project_pk, character_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     character = get_project_character(project, character_pk)
-    if not project_allows_character_changes(project):
-        raise Http404(_("No se pueden editar personajes en proyectos eliminados o pendientes de borrado."))
 
     if request.method == "POST":
         form = CharacterForm(request.POST, request.FILES, instance=character, project=project)
@@ -170,8 +166,9 @@ def character_edit(request, project_pk, character_pk):
 
 
 @login_required
+@project_access(Action.DELETE)
 def character_delete(request, project_pk, character_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     character = get_project_character(project, character_pk)
 
     if request.method == "POST":
@@ -183,11 +180,9 @@ def character_delete(request, project_pk, character_pk):
 
 
 @login_required
+@project_access(Action.CREATE)
 def mention_create(request, project_pk):
-    project = get_user_project(request.user, project_pk)
-    if not project_allows_character_changes(project):
-        messages.error(request, _("No se pueden gestionar menciones en proyectos eliminados o pendientes de borrado."))
-        return redirect("projects:detail", pk=project.pk)
+    project = request.project
 
     if request.method == "POST":
         get_reference_for_project(Character, project, request.POST.get("character"), _("Personaje no encontrado."))
@@ -232,11 +227,10 @@ def mention_create(request, project_pk):
 
 
 @login_required
+@project_access(Action.EDIT)
 def mention_edit(request, project_pk, mention_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     mention = get_project_mention(project, mention_pk)
-    if not project_allows_character_changes(project):
-        raise Http404(_("No se pueden gestionar menciones en proyectos eliminados o pendientes de borrado."))
 
     if request.method == "POST":
         get_reference_for_project(Character, project, request.POST.get("character"), _("Personaje no encontrado."))
@@ -264,11 +258,10 @@ def mention_edit(request, project_pk, mention_pk):
 
 
 @login_required
+@project_access(Action.DELETE)
 def mention_delete(request, project_pk, mention_pk):
-    project = get_user_project(request.user, project_pk)
+    project = request.project
     mention = get_project_mention(project, mention_pk)
-    if not project_allows_character_changes(project):
-        raise Http404(_("No se pueden gestionar menciones en proyectos eliminados o pendientes de borrado."))
 
     if request.method == "POST":
         return_url = mention_return_url(request, project, mention=mention)
@@ -284,4 +277,21 @@ def mention_delete(request, project_pk, mention_pk):
             "mention": mention,
             "return_url": mention_return_url(request, project, mention=mention),
         },
+    )
+
+
+@login_required
+@project_access(Action.DOWNLOAD)
+@require_safe
+def character_image(request, project_pk, character_pk):
+    character = get_project_character(request.project, character_pk)
+    image_file = open_private_file(character.image, f"characters/{request.project.pk}/")
+    try:
+        image_format = verified_image_format(image_file, allow_legacy_gif=True)
+    except (ValidationError, OSError):
+        image_file.close()
+        raise Http404(_("Imagen no disponible.")) from None
+    return private_file_response(
+        image_file, content_type=IMAGE_CONTENT_TYPES[image_format],
+        filename=f"character-{character.pk}.{image_format.lower()}",
     )

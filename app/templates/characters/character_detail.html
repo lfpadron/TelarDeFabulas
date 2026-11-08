@@ -1,16 +1,17 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{{ character.name }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
     <h1>{{ character.name }}</h1>
     <p class="muted">{% trans "Proyecto" %}: {{ project.name }}</p>
 
     {% if character.image %}
         <p>
-            <img src="{{ character.image.url }}" alt="{{ character.name }}" style="max-width: 220px; height: auto;">
+            <img src="{% url 'characters:image' project.pk character.pk %}" alt="{{ character.name }}" style="max-width: 220px; height: auto;">
         </p>
     {% endif %}
 
@@ -61,7 +62,7 @@
                 <tbody>
                     {% for mention in character_mentions %}
                         <tr>
-                            <td><a href="{% url 'manuscripts:detail' project.pk mention.node.pk %}">{{ mention.node.title }}</a></td>
+                            <td><a href="{% url 'manuscripts:detail' project.pk mention.node.pk %}">{{ mention.node.display_title }}</a></td>
                             <td>{{ mention.get_mention_type_display }}</td>
                             <td>
                                 {% if can_manage_mentions %}
@@ -117,7 +118,7 @@
                             <td><a href="{% url 'notes:detail' project.pk note.pk %}">{{ note.title }}</a></td>
                             <td>{{ note.get_status_display }}</td>
                             <td>{{ note.get_priority_display }}</td>
-                            <td>{% if note.node %}{{ note.node.title }}{% else %}-{% endif %}</td>
+                            <td>{% if note.node %}{{ note.node.display_title }}{% else %}-{% endif %}</td>
                             <td>{{ note.updated_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                         </tr>
                     {% endfor %}
@@ -130,7 +131,7 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'characters:list' project.pk %}">{% trans "Volver a personajes" %}</a>
-        {% if project.status != "PENDING_DELETION" and project.status != "DELETED" %}
+        {% if access.edit %}
             <a class="button" href="{% url 'characters:edit' project.pk character.pk %}">{% trans "Editar" %}</a>
             <a class="button" href="{% url 'notes:create' project.pk %}?character={{ character.pk }}">{% trans "Crear nota" %}</a>
             <a class="button warning" href="{% url 'characters:delete' project.pk character.pk %}">{% trans "Borrar" %}</a>

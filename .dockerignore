@@ -4,6 +4,7 @@ __pycache__
 *.pyc
 .env
 media
+private_media
 staticfiles
 .tui
 .pytest_cache

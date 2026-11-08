@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n project_permissions %}
 
 {% block title %}{{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
+{% project_permissions project as access %}
 <section class="panel">
     <h1>{{ project.name }}</h1>
 
@@ -32,13 +33,13 @@
         <a class="button" href="{% url 'characters:list' project.pk %}">{% trans "Índice de personajes" %}</a>
         <a class="button" href="{% url 'notes:list' project.pk %}">{% trans "Notas, ideas y pendientes" %}</a>
         <a class="button" href="{% url 'exports:list' project.pk %}">{% trans "Exportaciones" %}</a>
-        {% if project.status != "DELETED" %}
+        {% if access.edit %}
             <a class="button" href="{% url 'projects:edit' project.pk %}">{% trans "Editar" %}</a>
         {% endif %}
-        {% if project.status == "ACTIVE" or project.status == "FROZEN" %}
+        {% if access.delete %}
             <a class="button warning" href="{% url 'projects:delete' project.pk %}">{% trans "Marcar para borrar" %}</a>
         {% endif %}
-        {% if project.status == "FROZEN" or project.status == "PENDING_DELETION" %}
+        {% if access.restore %}
             <form class="inline-form" method="post" action="{% url 'projects:restore' project.pk %}">
                 {% csrf_token %}
                 <button class="button" type="submit">{% trans "Restaurar" %}</button>

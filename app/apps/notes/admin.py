@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from apps.core.admin import ProjectOwnedAdmin
+
 from .models import Note
 
 
 @admin.register(Note)
-class NoteAdmin(admin.ModelAdmin):
+class NoteAdmin(ProjectOwnedAdmin):
     list_display = (
         "title",
         "project",
