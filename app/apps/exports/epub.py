@@ -7,26 +7,13 @@ from ebooklib import epub
 
 from apps.manuscripts.models import ManuscriptNode
 
-from .services import css_alignment, css_font_name, css_number, heading_level, ordered_export_nodes, render_content_blocks
-
-
-def creator_for_user(user):
-    return getattr(user, "display_alias", "") or getattr(user, "name", "") or getattr(user, "email", "")
-
-
-def epub_title(export_job):
-    if export_job.root_node_id:
-        return export_job.root_node.display_title
-    return export_job.project.name
-
-
-def epub_language(project):
-    return project.locale or project.language or "es-mx"
+from .services import css_alignment, css_font_name, css_number, heading_level, render_content_blocks, selected_content
+from .snapshots import get_export_document
 
 
 def build_epub_css(style):
     text_alignment = css_alignment(style)
-    fallback_family = "serif" if style.font_category == style.FontCategory.SERIF else "sans-serif"
+    fallback_family = "serif" if style.font_category == "SERIF" else "sans-serif"
     return f"""
 body {{
   font-family: '{css_font_name(style.font_body)}', {fallback_family};
@@ -55,7 +42,7 @@ p {{
 
 def render_epub_node(node, style_template):
     tag = f"h{heading_level(node)}"
-    content_html = render_content_blocks(node.content)
+    content_html = render_content_blocks(selected_content(node))
     separator = ""
     if node.node_type == ManuscriptNode.NodeType.SCENE and style_template.scene_separator:
         separator = f'<div class="scene-separator">{escape(style_template.scene_separator)}</div>'
@@ -69,28 +56,29 @@ def render_epub_node(node, style_template):
 """
 
 
-def build_chapter_content(export_job, node):
+def build_chapter_content(node, style_template):
     return f"""<html>
   <head>
     <title>{escape(node.display_title)}</title>
   </head>
   <body>
-    {render_epub_node(node, export_job.style_template)}
+    {render_epub_node(node, style_template)}
   </body>
 </html>
 """
 
 
-def build_export_epub(export_job):
+def build_export_epub(export_job, *, document=None):
+    document = document or get_export_document(export_job)
     book = epub.EpubBook()
-    title = epub_title(export_job)
-    language = epub_language(export_job.project)
-    nodes = ordered_export_nodes(export_job)
+    title = document.title
+    language = document.locale
+    nodes = document.nodes
 
     book.set_identifier(f"telar-export-{export_job.pk}")
     book.set_title(title)
     book.set_language(language)
-    creator = creator_for_user(export_job.user)
+    creator = document.creator
     if creator:
         book.add_author(creator)
     book.add_metadata("DC", "description", _("Exportación EPUB generada por Telar de Fábulas."))
@@ -99,7 +87,7 @@ def build_export_epub(export_job):
         uid="telar-style",
         file_name="style.css",
         media_type="text/css",
-        content=build_epub_css(export_job.style_template).encode("utf-8"),
+        content=build_epub_css(document.style).encode("utf-8"),
     )
     book.add_item(style_item)
 
@@ -111,7 +99,7 @@ def build_export_epub(export_job):
             lang=language,
             uid=f"node-{node.id}",
         )
-        chapter.content = build_chapter_content(export_job, node)
+        chapter.content = build_chapter_content(node, document.style)
         chapter.add_item(style_item)
         book.add_item(chapter)
         chapters.append(chapter)

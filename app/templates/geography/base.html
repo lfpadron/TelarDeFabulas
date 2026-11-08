@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<style>
+    .geography { overflow-wrap: anywhere; }
+    .geography h1 { font-size: 1.8rem; }
+    .geography h2 { font-size: 1.25rem; margin-top: 1.5rem; }
+    .geo-tree, .geo-tree ul { list-style: none; margin: 0; padding: 0; }
+    .geo-tree .indent { padding-left: 14px; border-left: 1px solid #aab8ae; }
+    .geo-tree summary { cursor: pointer; padding: .6rem 0; }
+    .geo-tree summary strong { margin-right: .5rem; }
+    .geo-tree .geo-description { margin: 0 0 .5rem; color: #485249; }
+    .geo-tree .geo-actions { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; padding-bottom: .75rem; font-size: .9rem; }
+    .geo-tree .geo-order { display: inline-flex; gap: .25rem; }
+    .geo-tree .geo-order form { display: inline; margin: 0; }
+    .geo-tree .geo-order button { width: 34px; height: 34px; padding: 0; margin: 0; font-size: 1.1rem; }
+    .geo-tree details { border-top: 1px solid #d4dcd7; }
+    .geo-path { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; }
+    .geo-path li:not(:last-child)::after { content: " /"; color: #52605a; }
+    .geo-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .geography input, .geography select, .geography textarea { box-sizing: border-box; max-width: 100%; min-width: 0; }
+    .geo-pagination { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+</style>
+<section class="geography">
+    <p><a href="{% url 'projects:detail' project.pk %}">{{ project.name }}</a></p>
+    {% block geography_content %}{% endblock %}
+</section>
+{% endblock %}

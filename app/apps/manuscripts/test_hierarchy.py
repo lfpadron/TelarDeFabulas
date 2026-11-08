@@ -20,6 +20,7 @@ from .forms import ManuscriptNodeForm
 from .hierarchy import ALLOWED_CHILD_TYPES, editable_node_ids, load_structure
 from .models import ManuscriptNode
 from .services import get_valid_parent_queryset, move_node, move_node_down, move_node_up, normalize_positions
+from .version_services import get_current_draft_version, update_scene_version
 
 
 class HierarchyTests(SecurityTestCase):
@@ -138,7 +139,7 @@ class HierarchyTests(SecurityTestCase):
         self.assert_invalid(lambda: move_node(self.chapter, self.other_node))
 
     def test_scene_move_preserves_identity_content_and_all_references(self):
-        ExportJob.objects.filter(pk=self.job.pk).update(root_node=self.scene, status="DONE", file="historical.html")
+        ExportJob.objects.filter(pk=self.job.pk).update(root_node=self.scene, status="READY", file="historical.html")
         before = ManuscriptNode.objects.values().get(pk=self.scene.pk)
         references = (self.note.node_id, self.mention.node_id)
         moved = move_node(self.scene, self.chapter4, user=self.user)
@@ -150,7 +151,7 @@ class HierarchyTests(SecurityTestCase):
         self.job.refresh_from_db()
         self.assertEqual((self.note.node_id, self.mention.node_id), references)
         self.assertEqual(self.job.root_node_id, self.scene.pk)
-        self.assertEqual(self.job.status, "DONE")
+        self.assertEqual(self.job.status, "READY")
         self.assertEqual(self.job.file.name, "historical.html")
         self.assertEqual(moved.parent, self.chapter4)
         self.assert_positions()
@@ -275,12 +276,12 @@ class HierarchyTests(SecurityTestCase):
 
     def test_stale_text_instance_does_not_undo_committed_move(self):
         stale = ManuscriptNode.objects.get(pk=self.scene.pk)
+        version = get_current_draft_version(stale)
         move_node(self.scene, self.chapter4)
-        stale.content = "Edited after move."
-        stale.save()
+        updated = update_scene_version(stale, version, user=self.user, expected_revision=version.revision, content="Edited after move.")
         stale.refresh_from_db()
         self.assertEqual(stale.parent_id, self.chapter4.pk)
-        self.assertEqual(stale.word_count, 3)
+        self.assertEqual(updated.word_count, 3)
         self.assert_positions()
 
     def test_stale_structural_change_is_rejected(self):
@@ -291,12 +292,13 @@ class HierarchyTests(SecurityTestCase):
 
     def test_reloaded_moved_instance_can_be_edited(self):
         moved = move_node(self.scene, self.chapter4)
-        moved.content = "New text"
-        moved.save()
-        self.assertEqual(moved.word_count, 2)
+        version = get_current_draft_version(moved)
+        updated = update_scene_version(moved, version, user=self.user, expected_revision=version.revision, content="New text")
+        self.assertEqual(updated.word_count, 2)
 
     def test_legacy_fragment_is_readable_exportable_and_immutable(self):
         legacy = self.legacy(parent=self.chapter, content="Exact legacy text.\n\n")
+        self.capture_export(root_node=legacy)
         before = self.snapshot()
         self.assertContains(self.client.get(self.url("manuscripts:tree")), "Legacy fragment")
         self.assertContains(self.client.get(self.url("manuscripts:detail", node_pk=legacy.pk)), "Exact legacy text.")
@@ -399,7 +401,7 @@ class HierarchyTests(SecurityTestCase):
         by_id = {node.pk: node for node in ordered}
         self.assertEqual(by_id[self.scene.pk].export_depth, 3)
         self.assertEqual(by_id[self.chapter3.pk].export_depth, 1)
-        self.job.root_node = None
+        self.capture_export(root_node=None)
         html = build_export_html(self.job)
         indices = [html.index(f'id="node-{node.pk}"') for node in ordered]
         self.assertEqual(indices, sorted(indices))
@@ -407,7 +409,7 @@ class HierarchyTests(SecurityTestCase):
 
     def test_docx_epub_and_pdf_accept_both_hierarchy_paths(self):
         self.create("SCENE", self.chapter3, title="", content="Direct chapter scene.")
-        self.job.root_node = None
+        self.capture_export(root_node=None)
         ordered = ordered_project_nodes(self.project)
         doc = Document(BytesIO(build_export_docx(self.job)))
         self.assertEqual([p.text for p in doc.paragraphs if p.style.name.startswith("Heading")], [node.display_title for node in ordered])

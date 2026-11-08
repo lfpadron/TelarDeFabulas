@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Historial" %} | {{ scene.display_title }}{% endblock %}
+{% block content %}
+<section class="panel scene-version">
+    <h1>{% trans "Historial" %}: {{ scene.display_title }}</h1>
+    <p>{% trans "Versión de trabajo" %}: {% if draft %}V{{ draft.version_number }}{% else %}-{% endif %}
+       | {% trans "Definitiva vigente" %}: {% if final %}V{{ final.version_number }}{% else %}-{% endif %}</p>
+    <div class="table-wrap"><table class="version-history-table">
+        <thead><tr><th>{% trans "Versión" %}</th><th>{% trans "Etapa editorial" %}</th><th>{% trans "Creación" %}</th><th>{% trans "Modificación" %}</th><th>{% trans "Finalización" %}</th><th>{% trans "Definitiva vigente" %}</th><th>{% trans "Acciones" %}</th></tr></thead>
+        <tbody>{% for version in page_obj %}
+            <tr>
+                <td>V{{ version.version_number }}</td>
+                <td>{{ version.get_editorial_stage_display }}</td>
+                <td><time datetime="{{ version.created_at|date:'c' }}">{{ version.created_at|date:'Y-m-d' }}<br>{{ version.created_at|date:'H:i' }}</time></td>
+                <td><time datetime="{{ version.updated_at|date:'c' }}">{{ version.updated_at|date:'Y-m-d' }}<br>{{ version.updated_at|date:'H:i' }}</time></td>
+                <td>{% if version.finalized_at %}<time datetime="{{ version.finalized_at|date:'c' }}">{{ version.finalized_at|date:'Y-m-d' }}<br>{{ version.finalized_at|date:'H:i' }}</time>{% else %}-{% endif %}</td>
+                <td>{% if version.is_current_final %}{% trans "Sí" %}{% else %}-{% endif %}</td>
+                <td>{% include "manuscripts/_version_actions.html" %}</td>
+            </tr>
+        {% empty %}<tr><td colspan="7">{% trans "No hay versiones." %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="actions">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">{% trans "Anterior" %}</a>{% endif %}
+        <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">{% trans "Siguiente" %}</a>{% endif %}
+        <a href="{% url 'manuscripts:detail' project.pk scene.pk %}">{% trans "Volver a la escena" %}</a>
+    </div>
+</section>
+{% endblock %}

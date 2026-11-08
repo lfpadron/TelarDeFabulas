@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
@@ -11,9 +13,13 @@ from .models import ExportJob
 
 
 class ExportJobForm(forms.ModelForm):
+    request_key = forms.UUIDField(widget=forms.HiddenInput, initial=uuid4)
+    selection_confirmation = forms.CharField(widget=forms.HiddenInput, required=False)
+    export_mode = forms.ChoiceField(label=_("Modalidad"), choices=ExportJob.ExportMode.choices,
+                                    widget=forms.RadioSelect, initial="WORK", required=False)
     class Meta:
         model = ExportJob
-        fields = ("root_node", "style_template", "format")
+        fields = ("root_node", "style_template", "format", "export_mode", "notify_by_email")
         labels = {
             "root_node": _("Nodo raíz"),
             "style_template": _("Estilo"),
@@ -28,7 +34,7 @@ class ExportJobForm(forms.ModelForm):
             self.instance.user = user
         if project is not None:
             self.instance.project = project
-            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).order_by(
+            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).only("id", "project_id", "title", "node_type", "position").order_by(
                 "parent_id",
                 "position",
                 "title",
@@ -45,14 +51,15 @@ class ExportJobForm(forms.ModelForm):
 
         self.fields["root_node"].required = False
         self.fields["format"].choices = (
-            (ExportJob.ExportFormat.HTML, _("HTML")),
+            (ExportJob.ExportFormat.MARKDOWN, _("Markdown")),
             (ExportJob.ExportFormat.DOCX, _("DOCX")),
             (ExportJob.ExportFormat.PDF, _("PDF")),
-            (ExportJob.ExportFormat.EPUB, _("EPUB")),
         )
+        self.initial["format"] = ExportJob.ExportFormat.MARKDOWN
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data["export_mode"] = cleaned_data.get("export_mode") or "WORK"
         root_node = cleaned_data.get("root_node")
         style_template = cleaned_data.get("style_template")
 
@@ -70,16 +77,22 @@ class ExportJobForm(forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
-        export_job = super().save(commit=False)
-        export_job.user = self.user
-        export_job.project = self.project
-        if commit:
-            export_job.full_clean()
-            export_job.save()
-        return export_job
+        from .job_services import request_export
+
+        if not commit:
+            raise ValueError("Export requests must be saved atomically with their snapshot.")
+        return request_export(user=self.user, project=self.project,
+                              style_template=self.cleaned_data["style_template"],
+                              root_node=self.cleaned_data["root_node"],
+                              export_format=self.cleaned_data["format"], export_mode=self.cleaned_data["export_mode"],
+                              request_key=self.cleaned_data["request_key"],
+                              notify_by_email=self.cleaned_data["notify_by_email"],
+                              expected_counts=getattr(self, "expected_counts", None))
 
 
 class ExportPreviewForm(forms.Form):
+    export_mode = forms.ChoiceField(label=_("Modalidad"), choices=ExportJob.ExportMode.choices,
+                                    widget=forms.RadioSelect, initial="WORK", required=False)
     root_node = forms.ModelChoiceField(
         label=_("Nodo raíz"),
         queryset=ManuscriptNode.objects.none(),
@@ -96,7 +109,7 @@ class ExportPreviewForm(forms.Form):
         self.project = project
         super().__init__(*args, **kwargs)
         if project is not None:
-            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).order_by(
+            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).only("id", "project_id", "title", "node_type", "position").order_by(
                 "parent_id",
                 "position",
                 "title",
@@ -108,6 +121,7 @@ class ExportPreviewForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data["export_mode"] = cleaned_data.get("export_mode") or "WORK"
         root_node = cleaned_data.get("root_node")
         style_template = cleaned_data.get("style_template")
 

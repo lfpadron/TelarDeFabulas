@@ -1,10 +1,10 @@
 # Plan incremental de migracion de datos
 
-Fecha: 2026-11-06. Actualizado tras Prompt 04 (F2). El plan de transformaciones
-editoriales sigue siendo propuesto; solo se ejecuto la expansion acotada descrita
-abajo. Los nombres de migraciones futuras son descriptivos. No reemplazar ni
+Fecha: 2026-11-07. Actualizado tras Prompt 05 (F3). Se distinguen las expansiones
+F2 y el versionado F3 de las transformaciones futuras aun propuestas.
+Los nombres de migraciones futuras son descriptivos. No reemplazar ni
 editar las `0001_initial` existentes. Las evidencias iniciales de auditoria se
-conservan como historico; 07, 08 y 09 registran los avances posteriores.
+conservan como historico; 07, 08, 09 y 10 registran los avances posteriores.
 
 ## Expansion aplicada en F2
 
@@ -25,8 +25,8 @@ legado, texto Unicode/saltos exactos, posiciones y estados heredados, notas,
 menciones y referencia a export historico. Todos los campos anteriores y las
 relaciones se conservaron; la descripcion nueva quedo vacia.
 
-Esta entrega cubre solo descripcion/titulo de M1. SceneVersion, RefactoringRecord,
-backfill y constraints de orden siguen pendientes. FRAGMENT no se convierte ni
+F2 cubrio solo descripcion/titulo de M1. F3 agrega SceneVersion y su backfill;
+RefactoringRecord generico y constraints de orden siguen pendientes. FRAGMENT no se convierte ni
 borra; las ramas incompatibles quedan legibles/exportables y bloqueadas para
 escritura. La normalizacion ocurre en operaciones validas, no en la migracion ni
 como reparacion automatica de legado. Si se importan datos, repetir inventario y
@@ -36,6 +36,21 @@ Rollback: conservar la columna aditiva y usar un lector compatible. No ejecutar
 la reversa de 0002 sobre datos de trabajo: eliminaria descripciones nuevas.
 El retroceso de esquema usado en la prueba ocurre solo en `test_telar_fabulas`.
 Comandos y resultados: [09-manuscript-hierarchy-validation.md](09-manuscript-hierarchy-validation.md).
+
+## Expansion y copia F3
+
+Prompt 05 aprueba D04-D05 para esta entrega: versiones DRAFT/REVIEW editables,
+FINAL inmutable, una definitiva vigente independiente del borrador activo y
+guardado con revision esperada. `0003_scene_versions` agrega tabla, FK
+`current_draft_version` y ocho constraints. `0004_import_scene_versions` copia
+escenas con modelos historicos y deja los campos antiguos intactos.
+
+Se conserva la maquina `telar-fabulas-dev`, PostgreSQL y sus volumenes. Antes de
+la copia se detienen web/worker/beat, se revisan plan/SQL y se respalda la base.
+El detalle de respaldo, ensayo aislado, conteos y resultados esta en
+[10-scene-version-validation.md](10-scene-version-validation.md).
+Los textos no-SCENE siguen siendo reportados por `audit_refactoring`; no se
+convierten ni borran. Su contador persistido describe el legado, no SceneVersion.
 
 ## Condiciones para iniciar
 
@@ -101,47 +116,54 @@ de los primeros prompts. No retirar FRAGMENT ni content como efecto lateral de M
 
 ## Copia de contenido a SceneVersion
 
-Durante la copia no permitir escritores legacy concurrentes. Para una primera
-migracion de este tamano se propone ventana de escritura pausada, lectura
-disponible y workers de exportacion drenados. Si el inventario obliga a lotes
+Durante la copia no permitir escritores legacy concurrentes. F3 requiere ventana
+de mantenimiento con web/worker/beat detenidos y PostgreSQL activo. La migracion
+bloquea proyectos y despues escenas, en el mismo orden que los servicios.
+Si el inventario obliga a lotes
 online, implementar primero control de revision y comprobar hash antes/despues;
 un nodo modificado se marca para reprocesar. No asumir que un snapshot inicial
 seguira vigente mientras otro formulario puede guardar.
 
 Cada SCENE conserva su PK. Crear version_number=1 con scene_id igual al PK
 existente y content identico: sin strip, conversion de saltos, normalizacion
-Unicode ni interpretacion Markdown. Guardar checksum/longitud del UTF-8. Recalcular
+Unicode ni interpretacion Markdown. F3 guarda SHA-256 del UTF-8 en
+`legacy_source_hash` (la longitud no se persiste como columna). Recalcular
 word_count con una funcion estable de migracion y comparar con el valor anterior;
 si discrepa, registrar ambos, no cambiar el texto para hacerlos coincidir.
 
-Preservar created_at/updated_at de origen en el manifiesto y asignar los de la
-version inicial de forma explicita segun la politica aprobada. `auto_now_add` no
-debe inventar una fecha historica de escritura. Registrar aparte imported_at.
+F3 copia created_at/updated_at del nodo a la version inicial de forma explicita.
+El nodo y sus fechas permanecen intactos. `auto_now_add` no debe inventar una fecha
+historica de escritura. La fecha de ejecucion queda registrada en django_migrations;
+no se agrega una tabla generica de manifiestos ni un campo imported_at.
 Si el original no trae fecha de finalizacion, no inferirla de updated_at: registrar
 finalized_at al confirmar/importar la definitiva y marcar su procedencia.
 
-Tabla propuesta, pendiente de D04:
+Politica aprobada y aplicada por Prompt 05 (sustituye la propuesta D04):
 
-| Estado anterior | Etapa inicial propuesta | Precaucion |
+| Estado anterior | Etapa inicial | Precaucion |
 | --- | --- | --- |
-| PENDING, IN_PROGRESS, DRAFT | DRAFT | Conservar estado original en manifiesto |
+| PENDING, IN_PROGRESS, DRAFT | DRAFT | Estado original conservado en el nodo |
 | REVIEW | REVIEW | No convertir a definitiva |
 | FINISHED | REVIEW | Terminado no demuestra aprobacion para publicacion |
-| PUBLISHABLE, PUBLISHED | Candidato a FINAL | Solo tras aprobar criterio y comprobar contenido; guardar is_publishable original |
-| Cualquier estado con flags contradictorios | Revision de caso; copia preservada DRAFT/REVIEW segun decision | Nunca elegir FINAL solo porque un booleano este activo |
-| Escena vacia o solo espacios | Copia exacta DRAFT, provisionalmente sin vigente | Una escena vacia no justifica descartar la fila ni inventar contenido |
+| PUBLISHABLE, PUBLISHED | FINAL vigente | finalized_at es fecha de importacion; is_publishable original no se altera |
+| Estado conocido con flags contradictorios | La etapa depende de status, no de is_publishable | Booleano legado conservado, nunca usado para inventar aprobacion |
+| Escena vacia o solo espacios | Copia exacta con la etapa que corresponde a status | Tambien puede ser FINAL si status es PUBLISHABLE/PUBLISHED |
+| Estado desconocido | Detener con error y rollback del backfill | No elegir un estado por defecto |
 
-No ejecutar una conversion editorial ambigua por defecto. Se puede completar la
-copia de seguridad del texto sin activar exportacion final; los candidatos quedan
-pendientes de confirmar. Tras fijar la politica, activar como maximo una vigente
-por escena y asignar active_version. La version inicial puede ser activa aunque
-sea FINAL: para empezar otra redaccion, el servicio crea una copia DRAFT.
+Una V1 DRAFT/REVIEW se asigna a `current_draft_version`. Una V1 FINAL se marca
+`is_current_final=True` y deja el borrador activo NULL. Nunca se usa FINAL como
+borrador activo; para continuar se crea otra version DRAFT. Cada escena recibe
+revision 1, sin cambiar su ID ni notas/menciones/exportaciones historicas.
 
-Implementar copia idempotente con clave de procedencia: si ya existe la version
-de importacion, comparar source_hash, content y referencias. Nunca reemplazar una
-version existente porque su numero sea 1. Si hay escrituras nuevas, detener el
-lote para conciliacion. En el primer corte, conservar la copia importada como
-baseline inmutable y crear otra version al editarla.
+La clave de procedencia es `legacy_source_hash`, unica por escena cuando no esta
+vacia. Al repetir la logica se compara contra Node.content conservado; una huella
+distinta aborta. Una version importada DRAFT/REVIEW puede haberse editado despues:
+no comparar su texto actual para restaurarlo ni sobrescribirlo. Si ya existen
+versiones sin marca de importacion, se conservan; no asumir que V1 fue creada por
+la migracion. Las escenas nuevas posteriores no necesitan marca de importacion.
+La copia original permanece en Node.content y en el respaldo; solo FINAL es
+inmutable en los flujos de escritura. Pruebas verifican la idempotencia incluso
+despues de editar la version importada.
 
 RunPython debe obtener modelos historicos con apps.get_model y usar el alias de
 schema_editor.connection. Calcular explicitamente conteos, fechas y validaciones:
@@ -187,17 +209,19 @@ de normalizar. Conservar referencias en ExportJob aun si su destino se archiva.
 Mantener Node.content/status/is_publishable/word_count como campos legacy durante
 la transicion; son candidatos a obsolescencia SOLO para texto/estado de escenas.
 El futuro de content en contenedores depende de D03. No duplicar escrituras sin
-definir fuente de verdad. Propuesta: tras el corte, SceneVersion es la unica
+definir fuente de verdad. Desde F3, SceneVersion es la unica
 fuente de texto editable y Node.content queda congelado como respaldo heredado.
 Adaptar vistas/admin/exportadores antes de reabrir escrituras; impedir que un
 proceso antiguo siga guardando Node.content. Comparar el nuevo export de trabajo
 con el anterior antes de introducir las reglas de export final.
 
-Agregar restricciones en pasos independientes despues del saneamiento:
+Restricciones de versiones aplicadas y otras pendientes de saneamiento:
 
-- UNIQUE de numero por escena y vigente parcial; CHECK de etapa, contador,
-  revision y bandera/finalized_at; FK active_version en migracion posterior a
-  CreateModel para resolver referencia circular.
+- F3: UNIQUE de numero por escena, vigente parcial y huella no vacia por escena;
+  CHECK de numero/revision positivos, etapa valida y coherencia bandera/finalized_at.
+  FK current_draft_version despues de CreateModel para resolver referencia circular.
+  Tipo SCENE, origen de la misma escena y puntero de borrador se validan en servicios;
+  no son CHECKs que consulten otra fila. SQL/bulk directo no es API de escritura.
 - Posiciones no nulas/positivas y unicidad incluyendo raices; adaptar servicios
   antes de habilitarlas. Ciclos, tipo del padre y vinculo a misma escena se
   validan aparte, no mediante CHECK de otra fila.
@@ -212,6 +236,34 @@ Durante compatibilidad puede aceptar solo las excepciones legacy inventariadas;
 no habilitar creacion de nuevas excepciones para sortear la migracion.
 
 ## Migracion de exports y almacenamiento
+
+### F4 aplicada: Prompt 06
+
+`exports.0002_exportjob_enqueued_at_exportjob_export_mode_and_more` agrega
+export_mode (WORK para historicos), request_key UUID nullable unica, enqueued_at
+y ExportSnapshot con relacion uno a uno. No elimina columnas, registros ni
+archivos, no crea snapshots retroactivos y no cambia los estados existentes.
+Un trigger PostgreSQL rechaza UPDATE del snapshot; la reversa de la migracion
+rechaza quitar la tabla cuando contiene capturas. Mantener el esquema aditivo
+ante rollback de codigo; no restaurar un backup antiguo sobre trabajo posterior.
+
+La captura ocurre al solicitar, no al ejecutar Celery. Se bloquea primero el
+proyecto y despues el estilo, y se revalidan permisos bajo esos bloqueos. Los
+escritores de escenas y estructura de F2/F3 comparten el bloqueo del proyecto;
+UPDATE de estilos espera el bloqueo de su fila. Job y snapshot se confirman
+juntos; on_commit publica en la cola. Un fallo de broker deja PENDING y permite
+reenvio explicito del mismo snapshot. La entrega duplicada no vuelve a renderizar
+trabajos PROCESSING/DONE. Esto no reemplaza el futuro lease de F5.
+
+Inventario previo local: 1 cuenta, 1 proyecto vacio, 0 nodos y 0 exports. Respaldo
+`backups/p06_pre_snapshots_20261107.dump`, restaurado y contado en una base QA
+aislada antes de aplicar. SQL y migrate --plan revisados; no se reinicio PostgreSQL
+ni se borraron volumenes. Las huellas de los registros originales permanecieron
+identicas tras eliminar solo los datos QA. Compatibilidad con historicos no vacios
+probada con fixtures, no atribuida al inventario local que no tenia exportaciones.
+Resultados y restricciones en [11-export-snapshot-validation.md](11-export-snapshot-validation.md).
+
+### Pendiente: F5 y fases de almacenamiento
 
 Mapeo de estado: PENDING -> REQUESTED, PROCESSING -> PROCESSING,
 DONE -> READY, FAILED -> FAILED; DELETED es nuevo. Conservar PK, timestamps,
@@ -299,6 +351,31 @@ rechazar reversa destructiva o mantener expansion instalada. Documentar que
 recuperar de un backup antiguo sin conciliar puede perder trabajo posterior.
 
 Toda eliminacion de content legacy, FRAGMENT, version o archivo fuente exige una
-fase independiente, retencion aprobada y evidencia de recuperacion. Los pasos
-editoriales futuros no se han ejecutado; la expansion F2 aplicada esta delimitada
-al inicio de este documento y no autoriza transformaciones adicionales.
+fase independiente, retencion aprobada y evidencia de recuperacion, excepto el
+borrado explicito de una escena hoja ya disponible: CASCADE elimina sus versiones
+y la UI lo advierte. No hay borrado individual de versiones. F3 no agrega purgas.
+La reversa de 0004 lanza IrreversibleError si existe cualquier SceneVersion;
+mantener el esquema aditivo y un lector compatible. Solo las pruebas aisladas,
+sin versiones, retroceden al esquema previo. F2/F3 no autorizan otras conversiones.
+
+## Aplicacion Prompt 07: lifecycle de exportaciones
+
+`exports.0003_export_lifecycle` agrega leases, intentos, retencion, borrado y
+notificaciones; cambia PENDING->REQUESTED y DONE->READY. Conserva IDs, archivos,
+snapshots y manuscritos. Los READY/FAILED historicos reciben el plazo completo
+desde la migracion, no desde una fecha de creacion antigua; notify_by_email=False
+en historicos. PROCESSING recibe una ventana de gracia antes de ser recuperable.
+Un estado desconocido aborta la migracion. Las FK diferidas se comprueban antes
+de crear indices/constraints, manteniendo atomicidad en PostgreSQL.
+
+Despliegue realizado con web/worker/Beat detenidos ordenadamente, respaldo DB y
+media, plan revisado, migrate y reconstruccion. No usar workers de ambas versiones
+a la vez. Reversa bloqueada si existen intentos/eventos/notificaciones, Markdown,
+DELETED o borrado pendiente: conservar expansion o restaurar a un entorno aparte
+y conciliar el trabajo posterior. No restaurar a ciegas sobre datos nuevos.
+
+El respaldo `backups/p07_pre_lifecycle.dump` se restauro en una DB temporal; sus
+huellas de fuentes coinciden con la base original. Media se conserva en
+`backups/p07_private_media.tar.gz`. La DB temporal y los datos de QA fueron
+retirados, no los volumenes. Evidencia en
+[12-export-lifecycle-validation.md](12-export-lifecycle-validation.md).

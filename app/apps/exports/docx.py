@@ -7,7 +7,8 @@ from django.utils.translation import gettext as _
 
 from apps.manuscripts.models import ManuscriptNode
 
-from .services import heading_level, ordered_export_nodes
+from .services import heading_level, selected_content
+from .snapshots import get_export_document
 
 
 ALIGNMENTS = {
@@ -80,7 +81,7 @@ def add_node(document, node, style_template):
         run.font.name = style_template.font_heading
         run.font.size = Pt(as_float(style_template.heading_size))
 
-    for block in split_blocks(node.content):
+    for block in split_blocks(selected_content(node)):
         paragraph = document.add_paragraph(style="Normal")
         paragraph.add_run(block.replace("\n", "\n"))
         apply_normal_paragraph_format(paragraph, style_template)
@@ -92,10 +93,11 @@ def add_node(document, node, style_template):
         separator.add_run(style_template.scene_separator)
 
 
-def build_export_docx(export_job):
+def build_export_docx(export_job, *, document=None):
+    narrative = document or get_export_document(export_job)
     document = Document()
-    style_template = export_job.style_template
-    nodes = ordered_export_nodes(export_job)
+    style_template = narrative.style
+    nodes = narrative.nodes
     apply_document_styles(document, style_template)
 
     if style_template.include_table_of_contents:

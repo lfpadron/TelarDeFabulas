@@ -1,0 +1,43 @@
+{% extends "geography/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{{ location.name }} | {{ project.name }}{% endblock %}
+{% block geography_content %}
+{% project_permissions project as access %}
+<h1>{{ location.name }}</h1>
+<nav aria-label="{% trans 'Ruta jerárquica' %}">
+    <ol class="geo-path">{% for ancestor in path %}<li><a href="{% url 'geography:detail' project.pk ancestor.pk %}">{{ ancestor.name }}</a></li>{% endfor %}</ol>
+</nav>
+<p><strong>{% trans "Tipo" %}:</strong> {{ location.type_label }}</p>
+<p><strong>{% trans "Ubicación padre" %}:</strong>
+    {% if location.parent_id %}<a href="{% url 'geography:detail' project.pk location.parent_id %}">{{ path|slice:"-2:-1"|first }}</a>{% else %}{% trans "Sin padre (raíz)" %}{% endif %}
+</p>
+{% if location.short_description %}<h2>{% trans "Descripción breve" %}</h2><p>{{ location.short_description }}</p>{% endif %}
+{% if location.detailed_description %}<h2>{% trans "Desarrollo detallado" %}</h2><div class="geo-text">{{ location.detailed_description }}</div>{% endif %}
+<div class="actions">
+    <a class="button secondary" href="{% url 'geography:tree' project.pk %}">{% trans "Volver a geografía" %}</a>
+    {% if access.edit %}
+        <a class="button" href="{% url 'geography:create' project.pk %}?parent={{ location.pk }}">{% trans "Crear ubicación hija" %}</a>
+        <a class="button" href="{% url 'geography:edit' project.pk location.pk %}">{% trans "Editar" %}</a>
+        <a class="button" href="{% url 'geography:move' project.pk location.pk %}">{% trans "Mover" %}</a>
+        <a class="button warning" href="{% url 'geography:delete' project.pk location.pk %}">{% trans "Eliminar" %}</a>
+    {% endif %}
+</div>
+<h2>{% trans "Ubicaciones hijas" %}</h2>
+<ul>{% for child in children %}<li><a href="{% url 'geography:detail' project.pk child.pk %}">{{ child.name }}</a> · {{ child.type_label }}</li>{% empty %}<li>{% trans "Sin ubicaciones hijas." %}</li>{% endfor %}</ul>
+{% if children.has_other_pages %}
+<div class="geo-pagination">
+    {% if children.has_previous %}<a href="?children_page={{ children.previous_page_number }}&residents_page={{ residents.number }}">{% trans "Anterior" %}</a>{% endif %}
+    <span>{% blocktrans with current=children.number total=children.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
+    {% if children.has_next %}<a href="?children_page={{ children.next_page_number }}&residents_page={{ residents.number }}">{% trans "Siguiente" %}</a>{% endif %}
+</div>
+{% endif %}
+<h2>{% trans "Personajes habitantes" %}</h2>
+<ul>{% for resident in residents %}<li><a href="{% url 'characters:detail' project.pk resident.pk %}">{{ resident.name }}</a>{% if resident.alias %} ({{ resident.alias }}){% endif %}</li>{% empty %}<li>{% trans "Sin habitantes registrados." %}</li>{% endfor %}</ul>
+{% if residents.has_other_pages %}
+<div class="geo-pagination">
+    {% if residents.has_previous %}<a href="?residents_page={{ residents.previous_page_number }}&children_page={{ children.number }}">{% trans "Anterior" %}</a>{% endif %}
+    <span>{% blocktrans with current=residents.number total=residents.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
+    {% if residents.has_next %}<a href="?residents_page={{ residents.next_page_number }}&children_page={{ children.number }}">{% trans "Siguiente" %}</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

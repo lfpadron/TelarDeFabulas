@@ -47,10 +47,10 @@
                                 </span>
                             </td>
                             <td>{{ row.node.get_node_type_display }}</td>
-                            <td>{{ row.node.get_status_display }}</td>
-                            <td>{{ row.node.word_count }}</td>
+                            <td>{% if row.version %}V{{ row.version.version_number }} {{ row.editorial_label }}{% else %}{{ row.node.get_status_display }}{% endif %}</td>
+                            <td>{% if row.version %}{{ row.version.word_count }}{% else %}{{ row.node.word_count }}{% endif %}</td>
                             <td>
-                                {% if row.node.is_publishable %}
+                                {% if row.version.is_current_final or row.node.node_type != 'SCENE' and row.node.is_publishable %}
                                     {% trans "Sí" %}
                                 {% else %}
                                     {% trans "No" %}

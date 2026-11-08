@@ -157,6 +157,7 @@ Con los contenedores arriba, abre otra terminal y ejecuta:
 
 ```powershell
 podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate --plan
 podman --connection telar-fabulas-dev compose exec web python manage.py migrate
 ```
 
@@ -182,6 +183,25 @@ podman --connection telar-fabulas-dev compose exec web python manage.py migrate
 Para cambios futuros, generar migraciones con `makemigrations` y revisar su SQL
 antes de aplicarlas. No revertir 0002 en una base con descripciones nuevas:
 la reversa eliminaria esa columna; conservar el esquema aditivo en un rollback.
+
+F3 agrega `0003_scene_versions` (tabla, FK de borrador y restricciones) y
+`0004_import_scene_versions` (copia exacta de escenas). No retira columnas ni
+reescribe notas, menciones o exports historicos. Antes del despliegue: respaldo
+privado de PostgreSQL/media, inventario, detener web/worker/beat y revisar el plan.
+En mantenimiento, despues de respaldar y drenar trabajos en curso:
+
+```powershell
+podman --connection telar-fabulas-dev compose stop web worker beat
+podman --connection telar-fabulas-dev compose run --rm --no-deps web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose run --rm --no-deps web python manage.py migrate
+podman --connection telar-fabulas-dev compose up -d --build
+```
+
+PostgreSQL permanece activo durante el procedimiento.
+El procedimiento y su validacion estan en
+[10-scene-version-validation.md](docs/refactoring/10-scene-version-validation.md).
+No volver a un binario que solo lee `ManuscriptNode.content`: no contiene las
+ediciones nuevas. La reversa de 0004 se bloquea si existe historial.
 
 ## Crear superusuario
 
@@ -266,7 +286,7 @@ Tipos de nodo:
 - `SCENE`: escena.
 - `FRAGMENT`: legado de solo lectura, sin creacion ni conversion automatica.
 
-Estados de nodo:
+Estados legados del nodo (las escenas usan las etapas de SceneVersion):
 
 - `PENDING`: pendiente.
 - `IN_PROGRESS`: en progreso.
@@ -276,7 +296,8 @@ Estados de nodo:
 - `PUBLISHABLE`: publicable.
 - `PUBLISHED`: publicado.
 
-El conteo de palabras se calcula automáticamente al guardar `content`; mover un
+El conteo de palabras de una escena se calcula al guardar su version con revision
+esperada; en otros nodos se conserva el comportamiento de `content`. Mover un
 nodo no recalcula ni reescribe su texto. Si no se captura posición, el sistema lo
 agrega al final de sus hermanos. Solo se permite crear, editar o borrar nodos en
 proyectos propios `ACTIVE`.
@@ -288,6 +309,9 @@ sin persistir esa etiqueta. Todos incluyen `short_description` en creacion,
 edicion y detalle; el arbol muestra una version abreviada.
 
 El borrado de nodos de manuscrito es físico en esta fase, pero solo se permite borrar nodos sin hijos.
+La confirmacion de borrado de una escena advierte que tambien elimina todas sus
+versiones, incluidas las definitivas, por CASCADE. No existe borrado individual
+de versiones. Archivo y recuperacion de escenas eliminadas quedan pendientes.
 
 Reordenamiento visual v01:
 
@@ -306,8 +330,8 @@ Reglas de movimiento:
 - Después de mover, las posiciones de hermanos se normalizan automáticamente.
 - Editar texto no cambia padre, tipo ni posicion; para reestructurar se usa Mover.
 - Una instancia antigua usada solo para editar texto no revierte un movimiento
-  ya confirmado. Dos ediciones simultaneas del texto todavia son ultimo guardado;
-  el control de revisiones corresponde a SceneVersion, no a esta fase.
+  ya confirmado. En escenas, dos guardados con la misma revision producen un
+  ganador y un conflicto explicito, nunca una sobrescritura silenciosa.
 
 Jerarquía permitida:
 
@@ -341,6 +365,44 @@ podman --connection telar-fabulas-dev compose exec web python manage.py test app
 podman --connection telar-fabulas-dev compose exec web python manage.py test apps.accounts apps.projects apps.manuscripts apps.characters apps.notes apps.styles apps.exports
 podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
 ```
+
+### Versiones de escena (F3)
+
+Cada escena nueva recibe V1, `DRAFT`, revision 1. Sus metadatos se editan desde
+`Editar`; el texto, desde `Editar borrador`. `SceneVersion` es la unica fuente
+de texto de escenas para detalle, arbol, preview y los cuatro exportadores.
+`ManuscriptNode.content/status/word_count/is_publishable` permanecen como legado
+sin sincronizacion inversa. Los textos de contenedores y FRAGMENT no se convierten.
+
+- `DRAFT` (Borrador) y `REVIEW` (En revision) son editables.
+- `FINAL` (Definitivo) no es editable. Crear una version basada en ella para cambiar texto.
+- `current_draft_version` identifica el borrador activo; `is_current_final`
+  identifica la definitiva vigente con unicidad parcial en PostgreSQL.
+- Crear/restaurar hace una copia exacta nueva, con siguiente numero y `based_on`;
+  la convierte en borrador activo sin tocar versiones anteriores.
+- Finalizar conserva las definitivas historicas y retira solo su designacion
+  vigente. Si finaliza el borrador activo, no se elige otro borrador automaticamente.
+- Editar un borrador historico no lo convierte en activo. Para trabajar desde el,
+  usar `Restaurar como nueva version`.
+- Guardar exige la revision recibida al abrir el formulario. Un conflicto devuelve
+  HTTP 409 y conserva el texto enviado; la version guardada puede abrirse aparte.
+
+Rutas bajo `/projects/<id>/manuscript/<scene_id>/versions/`: historial, `create/`,
+`<version_id>/`, `<version_id>/edit/`, `review/`, `finalize/` y `restore/` (estas tres
+ultimas bajo `<version_id>/`). Crear/revisar/finalizar/restaurar son POST con CSRF.
+Solo el propietario accede; ACTIVE permite editar, FROZEN/PENDING_DELETION leen,
+DELETED devuelve 404. El admin de versiones es de solo lectura.
+
+La migracion mapea PENDING/IN_PROGRESS/DRAFT a DRAFT, REVIEW/FINISHED a REVIEW y
+PUBLISHABLE/PUBLISHED a FINAL vigente, incluso con texto vacio. Conserva bytes
+UTF-8, fechas originales, PK y referencias; registra la huella del texto legado.
+La fecha de finalizacion de una definitiva importada es la de importacion, no
+una fecha historica inferida. Repetir la logica no duplica ni sobrescribe versiones.
+
+HTML/DOCX/PDF/EPUB usan un snapshot durable capturado al solicitar. WORK elige
+el borrador activo, o la definitiva vigente si no hay borrador; FINAL selecciona
+solo definitivas vigentes. La preview utiliza el mismo selector, sin persistir
+snapshots. Ningun formato vuelve a consultar el manuscrito vivo en el worker.
 
 ## Personajes
 
@@ -590,28 +652,128 @@ http://localhost:8000/projects/<project_id>/exports/
 http://localhost:8000/projects/<project_id>/exports/create/
 http://localhost:8000/projects/<project_id>/exports/preview/
 http://localhost:8000/projects/<project_id>/exports/<export_id>/
+http://localhost:8000/projects/<project_id>/exports/<export_id>/download/
+http://localhost:8000/projects/<project_id>/exports/<export_id>/retry/
+http://localhost:8000/projects/<project_id>/exports/<export_id>/delete/
 ```
 
 Estados de `ExportJob`:
 
-- `PENDING`: solicitud creada y encolada.
+- `REQUESTED`: solicitud y snapshot conservados, con envio pendiente o ya encolado.
 - `PROCESSING`: worker Celery generando el archivo.
-- `DONE`: archivo generado y listo para descarga.
+- `READY`: archivo generado y listo para descarga hasta su caducidad.
 - `FAILED`: hubo error; el detalle muestra `error_message`.
+- `DELETED`: archivo, temporales y snapshot eliminados; se conserva auditoria minima.
+
+Modalidades:
+
+- `WORK`: borrador activo DRAFT/REVIEW, o definitiva vigente en su ausencia.
+  Una escena sin ninguna version conserva su encabezado sin contenido.
+- `FINAL`: solo definitivas vigentes y sus ancestros BOOK/PART/CHAPTER necesarios.
+  Omite escenas sin definitiva y contenedores vacios. Si no hay definitivas,
+  muestra validacion y no crea un trabajo. No incluye texto legado de contenedores.
+- `Revisar seleccion` muestra conteos antes de crear. FINAL exige confirmar la
+  seleccion y advierte las exclusiones; si cambian los conteos, pide revisar otra vez.
+
+Cada solicitud conserva texto exacto, version/revision, orden, titulos, descripcion,
+idioma y todos los ajustes del estilo en `ExportSnapshot`, con SHA-256 y proteccion
+SQL contra UPDATE. Editar, mover o borrar una escena despues no cambia la captura.
+La clave del formulario evita duplicar trabajos al reenviar la misma solicitud.
+Celery se publica despues del commit. Si Redis falla, se conserva REQUESTED con un
+mensaje y Beat reintenta. `Reintentar envio` realiza POST con CSRF y reutiliza el snapshot original.
+No reenviar manualmente trabajos historicos sin snapshot: su archivo sigue
+descargable, pero no se reconstruye a partir del contenido actual.
+
+Limites adicionales en `.env` (valores por defecto):
+
+```text
+EXPORT_SNAPSHOT_MAX_BYTES=20971520
+EXPORT_SNAPSHOT_MAX_NODES=10000
+```
+
+El limite de bytes corresponde al JSON canonico UTF-8 de toda la seleccion;
+el de nodos protege la carga de metadatos del proyecto completo. Un exceso
+rechaza toda la solicitud sin dejar un trabajo incompleto. No son cuotas de cuenta.
 
 Formatos v01:
 
-- `HTML`: implementado y guardado en `private_media/exports/<user_id>/<project_id>/<export_job_id>.html`.
-- La descarga se sirve desde Django como adjunto para bajar un único `.html` con CSS incrustado.
-- `DOCX`: implementado con `python-docx` y guardado en `private_media/exports/<user_id>/<project_id>/<export_job_id>.docx`.
-- `PDF`: implementado con `WeasyPrint` reutilizando el HTML/CSS de exportación y guardado en `private_media/exports/<user_id>/<project_id>/<export_job_id>.pdf`.
-- `EPUB`: implementado con `EbookLib` y guardado en `private_media/exports/<user_id>/<project_id>/<export_job_id>.epub`.
+- La interfaz ofrece `MARKDOWN` (`.md`, UTF-8), `DOCX` (python-docx) y `PDF` (WeasyPrint).
+- `HTML` y `EPUB` siguen disponibles internamente; sus archivos historicos se
+  descargan hasta caducar. HTML sigue siendo un solo adjunto con CSS incrustado.
+- Todos consumen el mismo snapshot WORK/FINAL. Markdown escapa sintaxis de texto
+  plano, conserva parrafos y sigue la profundidad real sin saltar niveles.
+- Nuevos archivos: `private_media/exports/<user>/<project>/<job>/<token>.<extension>`.
+  Cada intento escribe primero un `.part` exclusivo y publica con rename atomico.
+  Los nombres de archivos historicos no se modifican durante la migracion.
+
+### Ciclo de vida y correo (Prompt 07)
+
+Transiciones: REQUESTED -> PROCESSING -> READY/FAILED; FAILED -> REQUESTED
+solo cuando admite reintento; READY/FAILED -> DELETED. REQUESTED admite cancelacion
+segura. PROCESSING no admite borrado. Los servicios usan locks PostgreSQL en orden
+proyecto/trabajo; el token impide que un worker antiguo publique otro resultado.
+
+```dotenv
+EXPORT_READY_RETENTION_DAYS=7
+EXPORT_FAILED_RETENTION_DAYS=7
+EXPORT_MAX_ATTEMPTS=3
+EXPORT_STALE_MINUTES=30
+EXPORT_RETRY_BASE_SECONDS=60
+PUBLIC_BASE_URL=http://localhost:8000
+EMAIL_BACKEND=django.core.mail.backends.filebased.EmailBackend
+```
+
+Rangos: retencion 1-365 dias, intentos 1-10, lease 1-1440 minutos y base de
+backoff 1-3600 segundos. Valores invalidos impiden arrancar. Reintentos: 60, 120,
+240... segundos, maximo una hora; no se reinicia el contador al reintentar.
+OSError/errores operativos de DB son transitorios, excepto errores de permisos.
+Validaciones, permisos, snapshot ausente/corrupto y errores no clasificados son
+definitivos. El detalle siempre muestra mensajes genericos, nunca una traza.
+
+Beat recupera solicitudes abandonadas y leases vencidos cada minuto. El heartbeat
+se renueva cada 30 segundos como maximo, durante todo el render. Un fallo del
+broker no consume intentos de render; su solicitud queda visible y recuperable.
+Un FAILED transitorio espera su backoff antes de volver a REQUESTED.
+
+El checkbox de correo esta activado en solicitudes nuevas. Solo READY o FAILED
+definitivo generan un registro durable en `ExportNotification`; Beat lo entrega
+cada minuto, con hasta ocho intentos. Idiomas es-mx/en-us segun el usuario, sin
+texto literario, titulo de proyecto, snapshot ni adjuntos. Enlaces de detalle
+requieren login. Un fallo SMTP no cambia READY a FAILED.
+
+Por defecto NO se envia SMTP: el backend escribe en
+`private_media/development-emails/`. Para produccion configurar `EMAIL_BACKEND`
+SMTP y `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+`EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `DEFAULT_FROM_EMAIL`, `PUBLIC_BASE_URL` en `.env`.
+No activar TLS y SSL simultaneamente. No publicar ese directorio ni sus copias.
+La deduplicacion es **best-effort**, no exactamente una vez: si SMTP acepta un
+mensaje y el proceso cae antes de registrar `sent_at`, puede repetirse. Tras ocho
+fallos revisar el registro y la configuracion de correo; no se promete entrega.
+
+Eliminar usa POST+CSRF. Primero bloquea nuevas descargas, luego elimina archivos,
+temporales y snapshot, y finalmente confirma DELETED. Una descarga en curso
+mantiene un lock compartido hasta cerrar el archivo; el borrado espera sin
+interrumpirla. Si falla el disco, `cleanup_error` conserva el incidente y Beat
+reintenta. Nunca se borra texto fuente, versiones, notas ni personajes.
+
+`cleanup_expired_exports` corre cada 24 horas y solo caduca READY/FAILED. El acceso
+se bloquea desde `expires_at`, aunque la limpieza diaria aun no haya corrido.
+La migracion `exports.0003_export_lifecycle` convierte PENDING/DONE a
+REQUESTED/READY, conserva archivos y snapshots y concede a los historicos un
+plazo completo desde la migracion. Su correo queda desactivado para evitar avisos
+retroactivos. No se reinicia PostgreSQL ni se borran volumenes.
+
+Auditoria: `ExportAttempt` (token, numero y resultado), `ExportEvent` (transicion,
+fecha y codigo) y `ExportNotification` (entrega). Acceso SQL/admin es privilegiado;
+las escrituras directas no sustituyen los servicios del ciclo de vida.
+
+Validacion y limites: [12-export-lifecycle-validation.md](docs/refactoring/12-export-lifecycle-validation.md).
 
 Previsualización HTML limitada:
 
 - Disponible en `/projects/<project_id>/exports/preview/`.
-- Permite elegir nodo raíz y plantilla de estilo antes de crear una exportación real.
-- Renderiza en memoria el mismo HTML base usado por la exportación, pero no crea `ExportJob`, no encola Celery y no escribe archivos en `private_media`.
+- Permite elegir modalidad WORK/FINAL, nodo raíz y plantilla de estilo.
+- Renderiza en memoria el mismo HTML base, pero no crea `ExportJob` ni `ExportSnapshot`, no encola Celery y no escribe archivos en `private_media`.
 - Si la vista se recorta, muestra: `Vista previa limitada. Exporta el archivo completo para ver todo el manuscrito.`
 - Los límites son configurables por entorno:
 
@@ -627,11 +789,11 @@ Reglas principales:
 - Los proyectos `DELETED` no permiten lectura, exportacion ni descarga.
 - Si se elige nodo raíz, se exporta ese nodo y sus descendientes.
 - Si no se elige nodo raíz, se exportan todos los nodos raíz del proyecto y sus descendientes.
-- HTML, DOCX, PDF y EPUB solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
-- Los cuatro formatos recorren el mismo orden estable del arbol y admiten
+- Markdown, HTML, DOCX, PDF y EPUB solo incluyen manuscrito; no incluyen notas, ideas, pendientes, personajes ni metadata interna.
+- Los cinco formatos recorren el mismo orden estable del arbol y admiten
   `BOOK > CHAPTER > SCENE` y `BOOK > PART > CHAPTER > SCENE`. Los encabezados
   siguen la profundidad real; las escenas sin titulo usan la etiqueta visible.
-- Mover un nodo no regenera ni altera archivos de exportaciones terminadas.
+- Mover un nodo no regenera ni altera exportaciones terminadas o pendientes.
 - Usuarios `FREE` pueden usar estilos del sistema.
 - Usuarios `PREMIUM` pueden usar estilos del sistema y estilos propios.
 
@@ -643,6 +805,12 @@ Limitaciones actuales:
 - Las fuentes del PDF usan las fuentes disponibles en el sistema; fuentes embebidas quedan pendientes.
 - EPUB no embebe fuentes; los lectores aplican sus propias reglas de margen y paginación.
 - Validación EPUB externa queda pendiente.
+- La coordinacion de archivos necesita PostgreSQL directo y almacenamiento local
+  compartido entre web/worker. Un pool en modo transaccion o storage S3 requiere
+  adaptar los locks de descarga y la publicacion. Cada descarga activa usa una
+  conexion PostgreSQL adicional; medir capacidad antes de produccion.
+- El snapshot no fija versiones de librerias ni fuentes instaladas. Congela
+  contenido y configuracion, no promete igualdad binaria tras actualizar el runtime.
 
 Verificar el worker Celery:
 
@@ -766,7 +934,24 @@ pong. Las pruebas de concurrencia PostgreSQL y el escenario HTTP con Celery real
 se registran en
 [09-manuscript-hierarchy-validation.md](docs/refactoring/09-manuscript-hierarchy-validation.md).
 La suite usa una base temporal separada, no la base de trabajo. La revision visual
-en Chrome quedo bloqueada por la herramienta de control; no se da por completada.
+de F2 en Chrome quedo bloqueada por la herramienta de control.
+F3 aprobo **445 pruebas** (85 nuevas), incluidas 11 de migracion y 8 de concurrencia.
+El escenario HTTP V1-V4, las cuatro descargas via Celery y el movimiento con
+historial pasaron; tambien la revision visual de historial, definitiva y conflicto
+en escritorio/movil con el navegador integrado. Chrome no estuvo disponible en
+la automatizacion de esta sesion. Detalle en
+[10-scene-version-validation.md](docs/refactoring/10-scene-version-validation.md).
+F4 (Prompt 06) aprobo **482 pruebas**: 37 nuevas, incluidas ocho carreras
+PostgreSQL y una migracion historica. Se generaron y descargaron ocho archivos
+reales WORK/FINAL con Celery, conservando texto, orden y estilo anteriores a la
+ejecucion. Evidencia e inventario de esta entrega en
+[11-export-snapshot-validation.md](docs/refactoring/11-export-snapshot-validation.md).
+F5 (Prompt 07) aprobo **540 pruebas**: 58 nuevas, incluidas nueve pruebas de
+concurrencia/caida y una migracion historica. Markdown/DOCX/PDF WORK y FINAL,
+recuperacion, correo local, borrado y caducidad se validaron con Celery real.
+No se enviaron correos reales; los datos originales conservaron sus hashes.
+Inventario y resultados en
+[12-export-lifecycle-validation.md](docs/refactoring/12-export-lifecycle-validation.md).
 Podman sigue rootless, web usa `appuser`, y Compose sigue siendo compatible con
 Docker. Cambiar el prefijo a `docker compose` permite usar Docker sin cambiar YAML.
 
@@ -799,18 +984,64 @@ Docker. Cambiar el prefijo a `docker compose` permite usar Docker sin cambiar YA
         ├── projects/
         ├── manuscripts/
         ├── characters/
+        ├── geography/
         ├── notes/
         ├── exports/
         ├── styles/
         └── admin_dashboard/
 ```
 
+## Geografia territorial (F6.1)
+
+Desde el detalle de un proyecto, abrir **Geografia**:
+
+```text
+/projects/<project_pk>/geography/
+```
+
+Permite crear ubicaciones raiz o hijas, consultar/editar sus descripciones,
+moverlas a otro padre o a la raiz, subir/bajar entre hermanas y eliminar hojas
+sin habitantes. El arbol es colapsable con HTML nativo, sin librerias nuevas.
+Tipos: UNIVERSE, WORLD, CONTINENT, EMPIRE, KINGDOM, COUNTRY, PROVINCE, CITY y OTHER
+(con nombre de tipo personalizado opcional). No hay niveles obligatorios.
+
+El campo **Habitante de** de la ficha de personaje es opcional y solo ofrece
+ubicaciones del mismo proyecto. Los enlaces funcionan en ambos sentidos:
+personaje -> residencia y ubicacion -> habitantes. Mover conserva ID,
+descripciones y habitantes. La edicion de descripcion no cambia el padre;
+usar **Mover** para reorganizar. Una ubicacion con hijos o habitantes no se
+elimina; primero mover los hijos y retirar/cambiar las residencias.
+
+Solo el propietario accede. ACTIVE permite escribir; FROZEN y PENDING_DELETION
+son de lectura; DELETED devuelve 404. El admin conserva este aislamiento,
+incluidos superusuarios. Las mutaciones requieren POST y CSRF.
+
+Migraciones aditivas: `geography.0001_initial` y
+`characters.0003_character_residence`. No requieren reset ni borrado de volumen.
+Para actualizar otra instalacion, respaldar DB/media y detener escritores antes
+de aplicar el plan revisado:
+
+```powershell
+podman --connection telar-fabulas-dev compose stop web worker beat
+podman --connection telar-fabulas-dev compose run --rm --no-deps web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose run --rm --no-deps web python manage.py migrate
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py test apps.geography
+podman --connection telar-fabulas-dev compose exec web python manage.py test
+```
+
+F6.1 aprobo **624 pruebas**, 84 nuevas (74 funcionales, nueve de concurrencia y
+una de migracion). Se verifico el movimiento de Ciudad A entre provincias con
+dos habitantes, la vista escritorio/movil y las huellas originales sin cambios.
+Modelo, inventario de archivos, comandos, respaldo y limites en
+[13-geography-validation.md](docs/refactoring/13-geography-validation.md).
+Por ahora solo existe residencia principal; el historial queda para otra fase.
+
 ## Siguiente fase sugerida
 
-Continuar con F3: SceneVersion y control de revisiones de texto, resolviendo
-primero D04-D05 en `docs/refactoring/06-decisions-required.md`, con copia exacta
-y comprobacion de hashes antes de cambiar lectores. No convertir FRAGMENT ni
-texto de contenedores sin una politica aprobada. SceneVersion, suscripciones,
-nuevos exportadores y purgas no se implementaron en F2.
-TLS, limites de recursos, respaldos recuperables, cuotas y lifecycle de exports
-siguen pendientes para produccion; consultar el registro de riesgos.
+Continuar con F6.2: organizaciones y su aislamiento por proyecto. Geografia y
+residencia principal quedan implementadas en Prompt 08; organizaciones,
+entradas de mundo y referencias siguen pendientes, cada una con alcance propio.
+Suscripciones, comparacion visual y conversiones de FRAGMENT o texto legado
+requieren fases independientes. Antes de produccion faltan TLS, limites de
+recursos, monitorizacion, SMTP real y politica operativa de respaldos/cuotas.

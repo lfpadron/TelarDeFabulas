@@ -5,6 +5,7 @@ __pycache__
 .env
 media
 private_media
+backups
 staticfiles
 .tui
 .pytest_cache

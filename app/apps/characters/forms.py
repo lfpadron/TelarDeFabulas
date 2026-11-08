@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from apps.manuscripts.models import ManuscriptNode
+from apps.geography.models import GeographicLocation
 from apps.core.permissions import validate_project_action
 from apps.core.widgets import PrivateFileInput
 
@@ -23,6 +24,7 @@ class CharacterForm(forms.ModelForm):
         fields = (
             "name",
             "alias",
+            "residence",
             "image",
             "importance",
             "narrative_role",
@@ -77,6 +79,10 @@ class CharacterForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if project is not None:
             self.instance.project = project
+        self.fields["residence"].queryset = (
+            GeographicLocation.objects.filter(project=project).only("id", "name").order_by("name", "pk")
+            if project is not None else GeographicLocation.objects.none()
+        )
         self.fields["dramatic_roles"].choices = [
             choice
             for choice in CharacterDramaticRole.DramaticRole.choices

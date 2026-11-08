@@ -367,10 +367,12 @@ class ManuscriptNodeTests(TestCase):
 
     def test_moving_node_to_another_parent_preserves_content_and_metadata(self):
         book, chapter_one, chapter_two, scene_one, scene_two = self.create_book_with_chapters_and_scenes()
-        scene_one.content = "Uno dos tres cuatro."
-        scene_one.status = ManuscriptNode.NodeStatus.REVIEW
-        scene_one.is_publishable = True
-        scene_one.save()
+        # Historical metadata is preserved by moves, even after text is versioned.
+        ManuscriptNode.objects.filter(pk=scene_one.pk).update(
+            content="Uno dos tres cuatro.", status=ManuscriptNode.NodeStatus.REVIEW,
+            is_publishable=True, word_count=4,
+        )
+        scene_one.refresh_from_db()
         note = Note.objects.create(project=self.project, node=scene_one, title="Nota asociada")
         character = Character.objects.create(project=self.project, name="Ariadna")
         mention = CharacterMention.objects.create(

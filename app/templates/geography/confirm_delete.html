@@ -1,0 +1,13 @@
+{% extends "geography/base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Eliminar ubicación" %} | {{ project.name }}{% endblock %}
+{% block geography_content %}
+<h1>{% trans "Eliminar ubicación" %}</h1>
+<p>{% blocktrans with name=location.name %}¿Eliminar «{{ name }}»? Esta acción no se puede deshacer.{% endblocktrans %}</p>
+{% if blockers %}
+    <ul class="errorlist">{% for reason in blockers %}<li>{{ reason }}</li>{% endfor %}</ul>
+{% else %}
+    <form method="post">{% csrf_token %}<button class="button warning" type="submit">{% trans "Confirmar eliminación" %}</button></form>
+{% endif %}
+<p><a href="{% url 'geography:detail' project.pk location.pk %}">{% trans "Cancelar" %}</a></p>
+{% endblock %}

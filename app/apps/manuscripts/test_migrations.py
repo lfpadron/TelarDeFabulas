@@ -7,7 +7,8 @@ class HierarchyMigrationTests(TransactionTestCase):
     def test_additive_migration_preserves_legacy_ids_text_and_references(self):
         # Only the isolated test database is migrated backwards to exercise the old schema.
         latest = MigrationExecutor(connection).loader.graph.leaf_nodes()
-        old = [target for target in latest if target[0] != "manuscripts"] + [("manuscripts", "0001_initial")]
+        old = [target for target in latest if target[0] not in ("manuscripts", "exports")] + [
+            ("manuscripts", "0001_initial"), ("exports", "0002_exportjob_enqueued_at_exportjob_export_mode_and_more")]
         self.addCleanup(lambda: MigrationExecutor(connection).migrate(latest))
         executor = MigrationExecutor(connection)
         executor.migrate(old)
@@ -34,6 +35,7 @@ class HierarchyMigrationTests(TransactionTestCase):
         apps = MigrationExecutor(connection).loader.project_state(latest).apps
         after = apps.get_model("manuscripts", "ManuscriptNode").objects.values().get(pk=fragment.pk)
         self.assertEqual(after.pop("short_description"), "")
+        self.assertIsNone(after.pop("current_draft_version_id"))
         self.assertEqual(after, before)
         self.assertEqual(apps.get_model("notes", "Note").objects.get(pk=note.pk).node_id, fragment.pk)
         self.assertEqual(apps.get_model("characters", "CharacterMention").objects.get(pk=mention.pk).node_id, fragment.pk)

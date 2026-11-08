@@ -10,6 +10,7 @@ from .services import get_valid_parent_queryset, validate_parent_for_node
 
 
 class ManuscriptNodeForm(forms.ModelForm):
+    content = forms.CharField(label=_("Contenido"), required=False, strip=False, widget=forms.Textarea(attrs={"rows": 10}))
     class Meta:
         model = ManuscriptNode
         fields = (
@@ -57,6 +58,11 @@ class ManuscriptNodeForm(forms.ModelForm):
             self.fields["parent"].required = kind != "BOOK"
             self.fields["position"].required = False
         self.fields["title"].required = kind != "SCENE"
+        if kind == "SCENE":
+            for field in ("status", "is_publishable"):
+                self.fields.pop(field)
+            if self.instance.pk:
+                self.fields.pop("content")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -80,6 +86,15 @@ class ManuscriptNodeForm(forms.ModelForm):
             else:
                 node.save()
         return node
+
+
+class SceneVersionEditForm(forms.Form):
+    content = forms.CharField(label=_("Contenido"), required=False, strip=False, widget=forms.Textarea(attrs={"rows": 20}))
+    revision = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+
+
+class SceneVersionActionForm(forms.Form):
+    revision = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
 
 
 class ManuscriptNodeMoveForm(forms.Form):

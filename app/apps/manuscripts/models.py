@@ -69,6 +69,10 @@ class ManuscriptNode(models.Model):
     position = models.PositiveIntegerField(_("posición"), null=True, blank=True)
     is_publishable = models.BooleanField(_("es publicable"), default=False)
     word_count = models.PositiveIntegerField(_("conteo de palabras"), default=0, editable=False)
+    current_draft_version = models.ForeignKey(
+        "SceneVersion", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+", editable=False, verbose_name=_("versión de trabajo"),
+    )
     created_at = models.DateTimeField(_("creado"), auto_now_add=True)
     updated_at = models.DateTimeField(_("actualizado"), auto_now=True)
 
@@ -131,6 +135,10 @@ class ManuscriptNode(models.Model):
         validate_node_hierarchy(self)
         if self.position is not None and self.position < 1:
             raise ValidationError({"position": _("La posición debe ser un entero positivo.")})
+        if self.current_draft_version_id:
+            version = self.current_draft_version
+            if self.node_type != self.NodeType.SCENE or version.scene_id != self.pk or version.editorial_stage == "FINAL":
+                raise ValidationError(_("La versión de trabajo debe ser editable y pertenecer a esta escena."))
 
     @classmethod
     def siblings(cls, project, parent):
@@ -156,3 +164,54 @@ class ManuscriptNode(models.Model):
 
     def can_delete_safely(self):
         return not self.children.exists()
+
+
+class SceneVersion(models.Model):
+    class EditorialStage(models.TextChoices):
+        DRAFT = "DRAFT", _("Borrador")
+        REVIEW = "REVIEW", _("En revisión")
+        FINAL = "FINAL", _("Definitivo")
+
+    scene = models.ForeignKey(ManuscriptNode, on_delete=models.CASCADE, related_name="versions", verbose_name=_("escena"))
+    version_number = models.PositiveIntegerField(_("versión"))
+    editorial_stage = models.CharField(_("etapa editorial"), max_length=10, choices=EditorialStage.choices, default=EditorialStage.DRAFT)
+    content = models.TextField(_("contenido"), blank=True)
+    word_count = models.PositiveIntegerField(_("conteo de palabras"), default=0, editable=False)
+    revision = models.PositiveIntegerField(_("revisión"), default=1, editable=False)
+    is_current_final = models.BooleanField(_("definitiva vigente"), default=False, editable=False)
+    based_on = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="derived_versions", editable=False, verbose_name=_("basada en"))
+    legacy_source_hash = models.CharField(_("huella del texto importado"), max_length=64, blank=True, default="", editable=False)
+    created_at = models.DateTimeField(_("creado"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("actualizado"), auto_now=True)
+    finalized_at = models.DateTimeField(_("finalizado"), null=True, blank=True, editable=False)
+
+    class Meta:
+        ordering = ["scene_id", "version_number"]
+        verbose_name = _("versión de escena")
+        verbose_name_plural = _("versiones de escena")
+        constraints = [
+            models.UniqueConstraint(fields=["scene", "version_number"], name="scene_version_number_unique"),
+            models.UniqueConstraint(fields=["scene"], condition=models.Q(is_current_final=True), name="scene_one_current_final"),
+            models.UniqueConstraint(fields=["scene"], condition=~models.Q(legacy_source_hash=""), name="scene_one_legacy_import"),
+            models.CheckConstraint(condition=models.Q(version_number__gte=1), name="scene_version_number_positive"),
+            models.CheckConstraint(condition=models.Q(revision__gte=1), name="scene_version_revision_positive"),
+            models.CheckConstraint(condition=models.Q(editorial_stage__in=["DRAFT", "REVIEW", "FINAL"]), name="scene_version_stage_valid"),
+            models.CheckConstraint(condition=models.Q(is_current_final=False) | models.Q(editorial_stage="FINAL"), name="scene_current_final_stage"),
+            models.CheckConstraint(condition=(models.Q(editorial_stage="FINAL", finalized_at__isnull=False) | (~models.Q(editorial_stage="FINAL") & models.Q(finalized_at__isnull=True))), name="scene_finalized_date_valid"),
+        ]
+
+    def __str__(self):
+        return _("%(scene)s: V%(number)s") % {"scene": self.scene, "number": self.version_number}
+
+    def clean(self):
+        super().clean()
+        if not self.scene_id or self.scene.node_type != ManuscriptNode.NodeType.SCENE:
+            raise ValidationError(_("Las versiones solo pueden pertenecer a una escena."))
+        if self.based_on_id and self.based_on.scene_id != self.scene_id:
+            raise ValidationError(_("La versión de origen debe pertenecer a la misma escena."))
+
+    def save(self, *args, **kwargs):
+        raise ValidationError(_("Guarda las versiones mediante el servicio con revisión esperada."))
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_("El historial de versiones no se elimina individualmente."))

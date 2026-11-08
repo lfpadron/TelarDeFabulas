@@ -98,6 +98,36 @@
             margin: 0.25rem 0;
         }
 
+        .export-form p {
+            margin: 0.25rem 0;
+        }
+
+        .export-form #id_export_mode {
+            display: grid;
+            gap: 0.65rem;
+        }
+
+        .export-form label[for^="id_export_mode_"] {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 400;
+        }
+
+        .export-form input[type="radio"],
+        .export-form input[type="checkbox"] {
+            flex: 0 0 1rem;
+            width: 1rem;
+            height: 1rem;
+            padding: 0;
+            margin: 0;
+        }
+
+        .export-page h1 {
+            font-size: 1.5rem;
+            overflow-wrap: anywhere;
+        }
+
         .button {
             width: fit-content;
             border: 0;
@@ -164,6 +194,37 @@
 
         .muted {
             color: #5f6b76;
+        }
+
+        .scene-version h1 {
+            font-size: 1.5rem;
+            overflow-wrap: anywhere;
+        }
+
+        .scene-version .button {
+            max-width: 100%;
+            white-space: normal;
+        }
+
+        .version-history-table th,
+        .version-history-table td {
+            font-size: 0.875rem;
+            padding: 0.6rem;
+        }
+
+        .version-history-table time {
+            white-space: nowrap;
+        }
+
+        .version-history-table .actions {
+            width: 14rem;
+            align-items: flex-start;
+            gap: 0.35rem;
+        }
+
+        .version-history-table .button {
+            font-size: 0.8125rem;
+            padding: 0.35rem 0.5rem;
         }
     </style>
 </head>

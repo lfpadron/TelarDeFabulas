@@ -1,11 +1,26 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
+set "MODE=%~1"
+call :main
+set "RESULT_CODE=%ERRORLEVEL%"
+
+echo.
+if "%RESULT_CODE%"=="0" (
+    echo Proceso finalizado correctamente.
+) else (
+    echo ERROR: el proceso no se completo correctamente. Codigo: %RESULT_CODE%
+)
+echo.
+echo Pulse una tecla para cerrar...
+pause >nul
+endlocal & exit /b %RESULT_CODE%
+
+:main
 cd /d "%~dp0"
 
 set "REPO_URL=https://github.com/lfpadron/TelarDeFabulas.git"
 set "DEFAULT_BRANCH=main"
-set "MODE=%~1"
 
 if /I "%MODE%"=="help" goto :help
 if /I "%MODE%"=="-h" goto :help
@@ -28,7 +43,8 @@ if /I "%MODE%"=="diff-only" (
 if not "%MODE%"=="" (
     echo Opcion no reconocida: %MODE%
     echo.
-    goto :help
+    call :help
+    exit /b 1
 )
 
 :menu

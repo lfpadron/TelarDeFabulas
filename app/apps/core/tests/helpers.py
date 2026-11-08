@@ -1,4 +1,5 @@
 from io import BytesIO
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -8,6 +9,7 @@ from PIL import Image
 
 from apps.characters.models import Character, CharacterDramaticRole, CharacterMention
 from apps.exports.models import ExportJob
+from apps.exports.job_services import request_export
 from apps.manuscripts.models import ManuscriptNode
 from apps.notes.models import Note
 from apps.projects.models import Project
@@ -44,6 +46,12 @@ class SecurityTestCase(TestCase):
 
     def setUp(self):
         self.client.force_login(self.user)
+
+    def capture_export(self, **overrides):
+        self.job = request_export(**{"user": self.user, "project": self.project,
+                                     "style_template": self.style, "root_node": self.job.root_node,
+                                     "request_key": uuid4(), **overrides})
+        return self.job
 
     def url(self, name, **kwargs):
         if name.startswith("projects:"):

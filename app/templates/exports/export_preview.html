@@ -4,10 +4,10 @@
 {% block title %}{% trans "Previsualizar HTML" %} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
-<section class="panel">
+<section class="panel export-page">
     <h1>{% trans "Previsualizar HTML" %}: {{ project.name }}</h1>
 
-    <form method="get" novalidate>
+    <form class="export-form" method="get" novalidate>
         {{ form.as_p }}
         <div class="actions">
             <button class="button" type="submit">{% trans "Previsualizar" %}</button>
@@ -17,6 +17,10 @@
     </form>
 
     {% if preview_result %}
+        <p>{% trans "Escenas incluidas en la selección" %}: {{ preview_result.included_scene_count }}. {% trans "Escenas excluidas" %}: {{ preview_result.excluded_scene_count }}.</p>
+        {% if preview_result.excluded_scene_count %}
+            <p class="warning-note">{% trans "Las escenas sin definitiva vigente no se incluyen en la exportación final." %}</p>
+        {% endif %}
         <div class="actions" style="margin-top: 1rem;">
             <p class="muted">
                 {% blocktrans with node_count=preview_result.node_count word_count=preview_result.word_count max_nodes=max_nodes max_words=max_words %}

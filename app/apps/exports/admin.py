@@ -16,13 +16,17 @@ class ExportJobAdmin(ProjectOwnedAdmin):
         "project",
         "user",
         "format",
+        "export_mode",
         "status",
         "style_template",
         "root_node",
         "created_at",
         "finished_at",
+        "attempt_count",
+        "expires_at",
+        "notification_sent_at",
     )
-    list_filter = ("format", "status", "created_at", "started_at", "finished_at")
+    list_filter = ("format", "export_mode", "status", "created_at", "started_at", "finished_at")
     search_fields = (
         "project__name",
         "user__email",
@@ -46,7 +50,7 @@ class ExportJobAdmin(ProjectOwnedAdmin):
 
     @admin.display(description=_("archivo privado"))
     def private_download(self, obj):
-        if obj.status != ExportJob.ExportStatus.DONE or not obj.file:
+        if not obj.downloadable:
             return "-"
         url = reverse("exports:download", args=[obj.project_id, obj.pk])
         return format_html('<a href="{}">{}</a>', url, _("Descargar"))

@@ -42,6 +42,17 @@ class CharacterAdmin(ProjectOwnedAdmin):
     readonly_fields = ("private_image", "completion_percentage_display", "created_at", "updated_at")
     inlines = (CharacterDramaticRoleInline,)
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        project_id = obj.project_id if obj else request.POST.get("project") or request.GET.get("project")
+        if "residence" in form.base_fields:
+            queryset = form.base_fields["residence"].queryset
+            form.base_fields["residence"].queryset = (
+                queryset.filter(project_id=project_id).only("id", "name")
+                if str(project_id).isdigit() else queryset.none()
+            )
+        return form
+
     @admin.display(description=_("completitud"))
     def completion_percentage_display(self, obj):
         return f"{obj.completion_percentage}%"

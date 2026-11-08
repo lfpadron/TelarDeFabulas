@@ -10,6 +10,7 @@ from apps.projects.models import Project
 
 from .models import ManuscriptNode
 from .services import move_node, move_node_down, move_node_up, normalize_positions
+from .version_services import get_current_draft_version, update_scene_version
 
 
 @skipUnlessDBFeature("has_select_for_update")
@@ -84,13 +85,14 @@ class ManuscriptConcurrencyTests(TransactionTestCase):
 
     def test_text_save_during_move_preserves_new_text_and_location(self):
         stale = ManuscriptNode.objects.get(pk=self.scenes[0].pk)
+        version = get_current_draft_version(stale)
         def edit():
-            stale.content = "Concurrent text"
-            stale.save(update_fields=["content", "updated_at"])
+            update_scene_version(stale, version, user=self.user, expected_revision=version.revision, content="Concurrent text")
         self.simultaneously(edit, lambda: self.move(0, 1))
         current = ManuscriptNode.objects.get(pk=stale.pk)
-        self.assertEqual(current.content, "Concurrent text")
-        self.assertEqual(current.word_count, 2)
+        version.refresh_from_db()
+        self.assertEqual(version.content, "Concurrent text")
+        self.assertEqual(version.word_count, 2)
         self.assertEqual(current.parent_id, self.chapters[1].pk)
         self.assert_positions()
 

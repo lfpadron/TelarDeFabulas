@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from uuid import uuid4
 
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
@@ -44,8 +45,8 @@ class ProjectAuthorizationTests(SecurityTestCase):
 
     def test_other_user_cannot_export(self):
         self.client.force_login(self.other_user)
-        with patch("apps.exports.views.generate_export_job.delay") as delay:
-            response = self.client.post(self.url("exports:create"), {"format": "HTML", "style_template": self.style.pk})
+        with patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(self.url("exports:create"), {"format": "MARKDOWN", "style_template": self.style.pk, "request_key": str(uuid4())})
         self.assertEqual(response.status_code, 404)
         delay.assert_not_called()
 
@@ -80,8 +81,8 @@ class ProjectAuthorizationTests(SecurityTestCase):
         for status in ("FROZEN", "PENDING_DELETION"):
             self.set_status(status)
             before = list(ManuscriptNode.objects.order_by("pk").values())
-            with self.subTest(status=status), patch("apps.exports.views.generate_export_job.delay") as delay:
-                response = self.client.post(self.url("exports:create"), {"format": "HTML", "style_template": self.style.pk})
+            with self.subTest(status=status), patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(self.url("exports:create"), {"format": "MARKDOWN", "style_template": self.style.pk, "request_key": str(uuid4())})
             self.assertEqual(response.status_code, 302)
             delay.assert_called_once()
             self.assertEqual(list(ManuscriptNode.objects.order_by("pk").values()), before)

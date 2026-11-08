@@ -4,17 +4,32 @@
 {% block title %}{% trans "Exportación" %} #{{ export_job.id }} | {{ project.name }} | {% trans "Telar de Fábulas" %}{% endblock %}
 
 {% block content %}
-<section class="panel">
+<section class="panel export-page">
     <h1>{% trans "Exportación" %} #{{ export_job.id }}</h1>
 
     <p><strong>{% trans "Estado" %}:</strong> {{ export_job.get_status_display }}</p>
     <p><strong>{% trans "Formato" %}:</strong> {{ export_job.get_format_display }}</p>
+    <p><strong>{% trans "Modalidad" %}:</strong> {{ export_job.get_export_mode_display }}</p>
     <p><strong>{% trans "Proyecto" %}:</strong> {{ export_job.project }}</p>
-    <p><strong>{% trans "Nodo raíz" %}:</strong> {{ export_job.root_node|default:"-" }}</p>
-    <p><strong>{% trans "Estilo" %}:</strong> {{ export_job.style_template }}</p>
+    <p><strong>{% trans "Selección" %}:</strong> {{ export_job.captured_title|default:export_job.root_node|default:"-" }}</p>
+    <p><strong>{% trans "Estilo" %}:</strong> {{ export_job.captured_style|default:export_job.style_template }}</p>
+    {% if export_job.included_scenes != None %}
+        <p><strong>{% trans "Escenas incluidas" %}:</strong> {{ export_job.included_scenes }}</p>
+        <p><strong>{% trans "Escenas excluidas" %}:</strong> {{ export_job.excluded_scenes }}</p>
+    {% elif export_job.status != "DELETED" %}
+        <p class="muted">{% trans "Exportación histórica sin snapshot. Su archivo original se conserva." %}</p>
+    {% endif %}
     <p><strong>{% trans "Creada" %}:</strong> {{ export_job.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>{% trans "Iniciada" %}:</strong> {{ export_job.started_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</p>
     <p><strong>{% trans "Finalizada" %}:</strong> {{ export_job.finished_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</p>
+    <p><strong>{% trans "Caducidad" %}:</strong> {{ export_job.expires_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</p>
+    <p><strong>{% trans "Intentos" %}:</strong> {{ export_job.attempt_count }} / {{ export_job.max_attempts }}</p>
+    <p><strong>{% trans "Notificación por correo" %}:</strong> {% if export_job.notify_by_email %}{% trans "Activada" %}{% else %}{% trans "Desactivada" %}{% endif %}</p>
+    {% if export_job.notification_sent_at %}<p>{% trans "Correo enviado" %}: {{ export_job.notification_sent_at|date:"SHORT_DATETIME_FORMAT" }}</p>{% endif %}
+    {% if export_job.deletion_requested_at and export_job.status != "DELETED" %}
+        <p role="status">{% trans "Borrado pendiente. No se admiten nuevas descargas." %}</p>
+    {% endif %}
+    {% if export_job.cleanup_error %}<p class="warning-note">{{ export_job.cleanup_error }}</p>{% endif %}
 
     {% if export_job.error_message %}
         <h2>{% trans "Error" %}</h2>
@@ -22,9 +37,24 @@
     {% endif %}
 
     <div class="actions">
+        {% if can_retry %}
+            <form method="post" action="{% url 'exports:retry' project.pk export_job.pk %}">
+                {% csrf_token %}
+                <button class="button" type="submit">{% trans "Reintentar envío" %}</button>
+            </form>
+        {% endif %}
         <a class="button secondary" href="{% url 'exports:list' project.pk %}">{% trans "Volver a exportaciones" %}</a>
-        {% if export_job.status == "DONE" and export_job.file %}
+        {% if export_job.status == "REQUESTED" or export_job.status == "PROCESSING" %}
+            <a class="button secondary" href="{% url 'exports:detail' project.pk export_job.pk %}">{% trans "Actualizar estado" %}</a>
+        {% endif %}
+        {% if export_job.downloadable %}
             <a class="button" href="{% url 'exports:download' project.pk export_job.pk %}">{% trans "Descargar archivo" %}</a>
+        {% endif %}
+        {% if export_job.can_delete %}
+            <form method="post" action="{% url 'exports:delete' project.pk export_job.pk %}">
+                {% csrf_token %}
+                <button class="button secondary" type="submit">{% if export_job.status == "REQUESTED" %}{% trans "Cancelar solicitud" %}{% else %}{% trans "Eliminar exportación" %}{% endif %}</button>
+            </form>
         {% endif %}
     </div>
 </section>

@@ -32,7 +32,7 @@ class PrivateFileTests(SecurityTestCase):
         self.image_bytes = image_upload().read()
         self.character.image.save("portrait.png", ContentFile(self.image_bytes), save=True)
         self.job.file.save("book.html", ContentFile(b"<html>Private manuscript</html>"), save=False)
-        self.job.status = "DONE"
+        self.job.status = "READY"
         self.job.save()
         self.image_url = self.url("characters:image", character_pk=self.character.pk)
         self.download_url = self.url("exports:download", export_pk=self.job.pk)

@@ -105,7 +105,7 @@ class AdminSecurityTests(SecurityTestCase):
             self.assertNotContains(response, "old.png")
 
     def test_export_admin_is_readonly_and_links_to_authorized_download(self):
-        ExportJob.objects.filter(pk=self.job.pk).update(status="DONE", file=f"exports/{self.user.pk}/{self.project.pk}/old.html")
+        ExportJob.objects.filter(pk=self.job.pk).update(status="READY", file=f"exports/{self.user.pk}/{self.project.pk}/old.html")
         response = self.client.get(self.url_for(self.job))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.url("exports:download", export_pk=self.job.pk))

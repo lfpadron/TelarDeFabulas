@@ -13,8 +13,9 @@ from apps.core.permissions import Action, can_edit_project
 
 from .forms import ManuscriptNodeForm, ManuscriptNodeMoveForm
 from .hierarchy import ALLOWED_CHILD_TYPES, LEGACY_MESSAGE, editable_node_ids, load_structure, ordered_tree
-from .models import ManuscriptNode
+from .models import ManuscriptNode, SceneVersion
 from .services import move_node, move_node_down, move_node_up
+from .version_services import get_current_draft_version, get_current_final_version, select_scene_versions
 
 
 def get_project_node(project, node_pk):
@@ -31,6 +32,7 @@ def build_tree_rows(nodes):
     structure = {node.pk: {name: getattr(node, name) for name in
                            ("id", "project_id", "parent_id", "node_type", "title", "position")} for node in nodes}
     editable = editable_node_ids(structure)
+    versions = select_scene_versions(nodes, include_content=False)
     children_by_parent = {}
     for node in nodes:
         children_by_parent.setdefault(node.parent_id, []).append(node)
@@ -41,6 +43,8 @@ def build_tree_rows(nodes):
         index = siblings.index(node)
         movable = node.pk in editable and all(sibling.pk in editable for sibling in siblings)
         rows.append({"node": node, "level": level, "indent": min(level, 8) * 16,
+                     "version": versions.get(node.pk),
+                     "editorial_label": dict(SceneVersion.EditorialStage.choices).get(versions.get(node.pk, {}).get("editorial_stage")),
                      "editable": node.pk in editable, "can_move": movable,
                      "can_move_up": movable and index > 0,
                      "can_move_down": movable and index < len(siblings) - 1,
@@ -136,6 +140,9 @@ def node_detail(request, project_pk, node_pk):
     node = get_project_node(project, node_pk)
     node_mentions = node.character_mentions.filter(character__project=project).select_related("character").order_by("character__name", "mention_type")
     row = next(row for row in build_tree_rows(ManuscriptNode.objects.filter(project=project).defer("content").order_by("position", "created_at", "pk")) if row["node"].pk == node.pk)
+    draft = get_current_draft_version(node) if node.node_type == "SCENE" else None
+    final = get_current_final_version(node) if node.node_type == "SCENE" else None
+    working = draft or final
     return render(
         request,
         "manuscripts/node_detail.html",
@@ -145,6 +152,10 @@ def node_detail(request, project_pk, node_pk):
             "node_mentions": node_mentions,
             "can_manage_mentions": can_edit_project(request.user, project),
             "node_access": row,
+            "draft": draft,
+            "final": final,
+            "working_version": working,
+            "display_content": (working.content if working else "") if node.node_type == "SCENE" else node.content,
             "parent": ManuscriptNode.objects.filter(project=project, pk=node.parent_id).first(),
         },
     )

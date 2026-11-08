@@ -13,20 +13,28 @@
     <p class="muted">{% trans "Proyecto" %}: {{ project.name }}</p>
 
     <p><strong>{% trans "Tipo" %}:</strong> {{ node.get_node_type_display }}</p>
-    <p><strong>{% trans "Estado" %}:</strong> {{ node.get_status_display }}</p>
+    {% if node.node_type != 'SCENE' %}<p><strong>{% trans "Estado" %}:</strong> {{ node.get_status_display }}</p>{% endif %}
     <p><strong>{% trans "Posición" %}:</strong> {{ node.position }}</p>
-    <p><strong>{% trans "Palabras" %}:</strong> {{ node.word_count }}</p>
+    <p><strong>{% trans "Palabras" %}:</strong> {% if working_version %}{{ working_version.word_count }}{% else %}{{ node.word_count }}{% endif %}</p>
+    {% if node.node_type != 'SCENE' %}
     <p>
         <strong>{% trans "Publicable" %}:</strong>
         {% if node.is_publishable %}{% trans "Sí" %}{% else %}{% trans "No" %}{% endif %}
     </p>
+    {% endif %}
+    {% if node.node_type == 'SCENE' %}
+        <p><strong>{% trans "Versión de trabajo" %}:</strong> {% if draft %}V{{ draft.version_number }}: {{ draft.get_editorial_stage_display }}{% else %}-{% endif %}</p>
+        <p><strong>{% trans "Versión definitiva" %}:</strong> {% if final %}<a href="{% url 'manuscripts:version_detail' project.pk node.pk final.pk %}">V{{ final.version_number }}</a>{% else %}-{% endif %}</p>
+        <a href="{% url 'manuscripts:version_history' project.pk node.pk %}">{% trans "Ver historial" %}</a>
+        {% if working_version %}{% include "manuscripts/_version_actions.html" with scene=node version=working_version version_writable=node_access.editable %}{% endif %}
+    {% endif %}
     {% if parent %}
         <p><strong>{% trans "Padre" %}:</strong> <a href="{% url 'manuscripts:detail' project.pk parent.pk %}">{{ parent.display_title }}</a></p>
     {% endif %}
 
-    {% if node.content %}
+    {% if display_content %}
         <h2>{% trans "Contenido" %}</h2>
-        <p>{{ node.content|linebreaksbr }}</p>
+        <div style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ display_content }}</div>
     {% endif %}
 
     <h2>{% trans "Personajes en esta parte" %}</h2>

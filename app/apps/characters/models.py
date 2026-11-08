@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
 from apps.manuscripts.models import ManuscriptNode
@@ -46,6 +46,10 @@ class Character(models.Model):
     )
     name = models.CharField(_("nombre"), max_length=180)
     alias = models.CharField(_("alias"), max_length=180, blank=True)
+    residence = models.ForeignKey(
+        "geography.GeographicLocation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="residents", verbose_name=_("Habitante de"),
+    )
     image = models.FileField(
         _("imagen"),
         upload_to=character_image_upload_to,
@@ -134,12 +138,27 @@ class Character(models.Model):
         super().clean()
         if self.project_id:
             validate_project_action(self.project)
+        if self.residence_id:
+            from apps.geography.models import GeographicLocation
+
+            if not GeographicLocation.objects.using(self._state.db).filter(pk=self.residence_id, project_id=self.project_id).exists():
+                raise ValidationError({"residence": _("La residencia debe pertenecer al mismo proyecto que el personaje.")})
         if self.narrative_role != self.NarrativeRole.OTRO:
             self.custom_narrative_role = ""
 
     def save(self, *args, **kwargs):
-        self.full_clean()
-        return super().save(*args, **kwargs)
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            self.project = Project.objects.using(using).select_for_update().get(pk=self.project_id)
+            if self.pk and not self._state.adding:
+                original = type(self).objects.using(using).get(pk=self.pk)
+                if original.project_id != self.project_id:
+                    raise ValidationError(_("No se permite trasladar personajes a otro proyecto."))
+                fields = kwargs.get("update_fields")
+                if fields is not None and not {"residence", "residence_id"}.intersection(fields):
+                    self.residence_id = original.residence_id
+            self.full_clean()
+            return super().save(*args, **kwargs)
 
 
 class CharacterDramaticRole(models.Model):

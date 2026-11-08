@@ -1,0 +1,31 @@
+{% load i18n project_permissions %}
+{% project_permissions project as access %}
+<div class="actions">
+    <a href="{% url 'manuscripts:version_detail' project.pk scene.pk version.pk %}">{% trans "Ver versión" %}</a>
+    {% if access.edit and version_writable %}
+        {% if version.editorial_stage != 'FINAL' %}
+            <a class="button" href="{% url 'manuscripts:version_edit' project.pk scene.pk version.pk %}">{% trans "Editar borrador" %}</a>
+            {% if version.editorial_stage != 'REVIEW' %}
+                <form class="inline-form" method="post" action="{% url 'manuscripts:version_review' project.pk scene.pk version.pk %}">
+                    {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                    <button class="button secondary" type="submit">{% trans "Marcar en revisión" %}</button>
+                </form>
+            {% endif %}
+        {% endif %}
+        {% if not version.is_current_final %}
+            <form class="inline-form" method="post" action="{% url 'manuscripts:version_finalize' project.pk scene.pk version.pk %}">
+                {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+                <button class="button secondary" type="submit">{% trans "Marcar definitiva" %}</button>
+            </form>
+        {% endif %}
+        <form class="inline-form" method="post" action="{% url 'manuscripts:version_create' project.pk scene.pk %}">
+            {% csrf_token %}<input type="hidden" name="source_version" value="{{ version.pk }}">
+            <input type="hidden" name="revision" value="{{ version.revision }}">
+            <button class="button secondary" type="submit">{% trans "Crear nueva versión" %}</button>
+        </form>
+        <form class="inline-form" method="post" action="{% url 'manuscripts:version_restore' project.pk scene.pk version.pk %}">
+            {% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+            <button class="button secondary" type="submit">{% trans "Restaurar como nueva versión" %}</button>
+        </form>
+    {% endif %}
+</div>

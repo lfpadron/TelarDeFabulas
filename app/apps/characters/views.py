@@ -20,7 +20,10 @@ from .validators import IMAGE_CONTENT_TYPES, verified_image_format
 
 
 def get_project_character(project, character_pk):
-    return get_object_or_404(Character, pk=character_pk, project=project)
+    return get_object_or_404(
+        local_project_relations(Character.objects.select_related("residence")),
+        pk=character_pk, project=project,
+    )
 
 
 def get_project_mention(project, mention_pk):

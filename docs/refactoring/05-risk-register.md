@@ -88,3 +88,42 @@ problemas, migraciones al dia y Celery pong. Los resultados y el alcance estan e
 R14, R16-R17, R22-R28 no se cierran por esta entrega. Las operaciones ORM
 `update`/`bulk_*`, shell y acceso directo a PostgreSQL requieren confianza y no
 constituyen una API autorizada; evitar exponerlos desde entradas futuras.
+
+## Actualizacion tras Prompt 07: F5
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R08 / R11 / R20 | Mitigados para exportaciones con snapshot | F4 congela contenido, seleccion y estilo; F5 reintenta sin recapturar. Historicos sin snapshot conservan su archivo hasta caducar, no se regeneran |
+| R09 | Mitigado con lease y fencing | Claim PostgreSQL atomico, heartbeat renovable, maximo de intentos, backoff, recovery Beat y auditoria. Dos workers no reclaman el mismo intento; el antiguo no publica. Si un proceso queda vivo tras perder lease, puede terminar calculos inutiles, pero no escribir ni publicar |
+| R10 | Mitigado en storage local compartido | Tombstone bloquea nuevas descargas, lock compartido de sesion durante streaming y exclusivo no bloqueante para cleanup. DELETED solo despues de borrar archivos y snapshot. Fallo fisico queda pendiente y se reintenta. No compatible sin adaptar con PgBouncer transaction pooling o S3 |
+| R13 | Ensayo local cerrado; operacion de produccion pendiente | Respaldo DB+media antes de la migracion; pg_restore aislado y hashes de fuentes comparados. Faltan calendario, cifrado, ubicacion externa, retencion y ensayo recurrente |
+| R14 | Mitigado para este despliegue drenado | web/worker/Beat detenidos ordenadamente antes de migrar, PENDING->REQUESTED y DONE->READY, gracia completa a historicos, sin correo retroactivo ni borrado durante migracion |
+| R16 / R19 | Abiertos para produccion | Faltan medidas de memoria/latencia con novelas grandes, time limits, cuotas, TLS y hardening. Cada descarga consume una conexion PostgreSQL adicional; un renderer bloqueado que mantiene heartbeat requiere intervencion operacional |
+| R29 / P2 | Entrega de correo best-effort | Outbox unico por job/evento/intento, claim de envio, Message-ID estable y hasta ocho intentos. SMTP y DB no son atomicos: caida tras aceptar SMTP puede duplicar. Error de correo nunca cambia READY; agotamiento requiere revision administrativa |
+| R30 / P2 | Filesystem y PostgreSQL no son una sola transaccion | Rutas por intento, fsync+rename atomico y clave durable permiten recuperar un parcial o archivo publicado antes del commit. Borrado fisico previo al commit se puede repetir; no hay promesa de recuperacion frente a perdida de disco/backup |
+
+Evidencia y limites en [12-export-lifecycle-validation.md](12-export-lifecycle-validation.md).
+Se mantiene una sola instancia de Beat. La disponibilidad del scheduler/broker y
+los registros de limpieza/correo requieren monitorizacion antes de produccion.
+Los backups y copias que un usuario ya descargo no se purgan al borrar el archivo
+activo: deben tener su propia politica. F5 no borra fuentes ni elimina cuentas.
+
+## Actualizacion tras Prompt 08: F6.1
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R03 / R06 / R07 | Mitigados en las entradas geograficas | Propietario y estado centralizados; bloqueo de Project antes de crear/mover/borrar o guardar residencia; nueve carreras PostgreSQL. UNIQUE inmediato de posiciones con NULLS NOT DISTINCT y checks locales. Ciclos y pertenencia cruzada se validan en servicios, no mediante triggers |
+| R04 | Movimiento protegido de formularios antiguos | Editar descripciones no expone padre/posicion; save conserva movimientos concurrentes o rechaza conflicto estructural. No hay revision optimista del texto geografico: dos ediciones simultaneas de descripcion siguen siendo ultimo guardado gana |
+| R12 | Borrado geografico restringido | PROTECT para hijos, servicio rechaza residentes, confirmacion/POST/CSRF; bulk delete desactivado en admin. Character.residence usa SET_NULL como defensa referencial, nunca CASCADE. Una futura purga de proyectos debe resolver el arbol explicitamente |
+| R13 | Respaldo de esta fase ensayado | p08_pre_geography.dump restaurado en base aislada, hashes de datos originales iguales; copia temporal retirada. Sigue pendiente la operacion de backups externa/recurrente de produccion |
+| R16 / R17 | Consultas acotadas, volumen web pendiente | Arbol y ruta iterativos, metadatos sin desarrollo detallado, una consulta por selector; prueba de 1100 niveles. Detalles paginan hijos/habitantes a 50. Arbol y selectores aun materializan todo el proyecto; falta carga progresiva y presupuesto de latencia/DOM para grandes volumenes |
+| R31 / P2 | Historial de residencia no modelado | Solo FK principal opcional por personaje. Cambiarla no deja historial territorial; una fase posterior puede agregar periodos sin recrear personajes/ubicaciones |
+
+624 pruebas aprobadas, aislamiento incluido admin, QA HTTP y navegador integrado
+en escritorio/movil. No se modificaron fuentes originales, exportadores ni
+reglas comerciales. Evidencia en [13-geography-validation.md](13-geography-validation.md).
+`QuerySet.update`, `bulk_*`, `QuerySet.delete` y SQL directo siguen siendo APIs
+privilegiadas: pueden saltar validaciones del grafo y el rechazo de borrado por
+habitantes. No exponerlas como escritores de negocio; las entradas web/admin
+usan los servicios/modelos protegidos. La restriccion SQL de orden no valida
+proyecto del padre ni ciclos indirectos. No se afirma proteccion contra SQL hostil.

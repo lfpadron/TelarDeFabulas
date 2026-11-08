@@ -110,8 +110,23 @@ def save_node(node, *args, **kwargs):
                     setattr(node, name, getattr(existing, name))
                 elif name in loaded and getattr(existing, name) != loaded[name]:
                     raise ValidationError(_("El nodo fue movido o modificado. Recarga antes de cambiar su estructura."))
+            if existing.node_type == "SCENE":
+                if node.node_type != "SCENE":
+                    raise ValidationError(_("Una escena con historial no cambia de tipo."))
+                for name in ("content", "status", "word_count", "is_publishable"):
+                    if update_fields is None or name in update_fields:
+                        if getattr(node, name) != getattr(existing, name):
+                            raise ValidationError(_("El texto y la etapa de una escena se editan desde sus versiones con control de revisión."))
+                    setattr(node, name, getattr(existing, name))
+            elif node.node_type == "SCENE":
+                raise ValidationError(_("La conversión de nodos existentes a escena requiere una migración explícita."))
+            # Only version services may switch the working version pointer.
+            if update_fields is not None and ("current_draft_version" in update_fields or "current_draft_version_id" in update_fields):
+                raise ValidationError(_("La versión de trabajo se selecciona mediante los servicios de versiones."))
+            node.current_draft_version_id = existing.current_draft_version_id
         node.project = project
-        node.word_count = count_words(node.content)
+        if existing is None or node.node_type != "SCENE":
+            node.word_count = count_words(node.content)
         node.full_clean()
         structural = existing is None or (existing.parent_id, existing.node_type, existing.position) != (node.parent_id, node.node_type, node.position)
         if structural:
@@ -123,6 +138,10 @@ def save_node(node, *args, **kwargs):
             if structural:
                 kwargs["update_fields"].add("position")
         result = models.Model.save(node, *args, **kwargs)
+        if existing is None and node.node_type == "SCENE":
+            from .version_services import _create_version_locked
+
+            _create_version_locked(node, node.content)
         if structural:
             _write_positions(siblings, using)
             if existing and existing.parent_id != node.parent_id:

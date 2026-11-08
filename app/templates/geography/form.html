@@ -1,0 +1,15 @@
+{% extends "geography/base.html" %}
+{% load i18n %}
+{% block title %}{{ title }} | {{ project.name }}{% endblock %}
+{% block geography_content %}
+<h1>{{ title }}</h1>
+{% if location %}<p>{{ location.name }}</p>{% endif %}
+<form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions">
+        <button class="button" type="submit">{% trans "Guardar" %}</button>
+        <a class="button secondary" href="{% url 'geography:tree' project.pk %}">{% trans "Cancelar" %}</a>
+    </div>
+</form>
+{% endblock %}

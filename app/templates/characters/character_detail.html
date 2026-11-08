@@ -16,6 +16,11 @@
     {% endif %}
 
     <p><strong>{% trans "Alias" %}:</strong> {{ character.alias|default:"-" }}</p>
+    <p><strong>{% trans "Habitante de" %}:</strong>
+        {% if character.residence_id %}
+            <a href="{% url 'geography:detail' project.pk character.residence_id %}">{{ character.residence.name }}</a>
+        {% else %}-{% endif %}
+    </p>
     <p><strong>{% trans "Importancia" %}:</strong> {{ character.get_importance_display }}</p>
     <p>
         <strong>{% trans "Rol narrativo" %}:</strong>

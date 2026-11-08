@@ -4,6 +4,7 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+from uuid import uuid4
 
 from docx import Document
 from django.contrib.auth import get_user_model
@@ -17,6 +18,7 @@ from apps.projects.models import Project
 from apps.styles.models import StyleTemplate
 
 from .models import ExportJob
+from .job_services import request_export
 from .pdf import build_export_pdf_html
 from .tasks import generate_export_job
 
@@ -96,11 +98,16 @@ class ExportJobTests(TestCase):
         self.own_style = StyleTemplate.objects.create(user=self.premium_user, name="Estilo propio")
         self.other_style = StyleTemplate.objects.create(user=self.other_user, name="Estilo ajeno")
 
+    def make_job(self, **kwargs):
+        kwargs["export_format"] = kwargs.pop("format", "HTML")
+        return request_export(request_key=uuid4(), **kwargs)
+
     def export_payload(self, **overrides):
         payload = {
             "root_node": "",
             "style_template": self.system_style.pk,
-            "format": ExportJob.ExportFormat.HTML,
+            "format": ExportJob.ExportFormat.MARKDOWN,
+            "request_key": str(uuid4()),
         }
         payload.update(overrides)
         return payload
@@ -160,10 +167,10 @@ class ExportJobTests(TestCase):
             xhtml_names = [name for name in epub_zip.namelist() if name.endswith(".xhtml")]
             return "\n".join(epub_zip.read(name).decode("utf-8") for name in xhtml_names)
 
-    def test_authenticated_user_can_create_html_export_for_own_project(self):
+    def test_authenticated_user_can_create_markdown_export_for_own_project(self):
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay") as delay:
+        with patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(self.create_url(), self.export_payload())
 
         export_job = ExportJob.objects.get(project=self.project)
@@ -252,7 +259,7 @@ class ExportJobTests(TestCase):
     def test_user_can_use_system_style(self):
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay"):
+        with patch("apps.exports.job_services.enqueue_export"), self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(self.create_url(), self.export_payload(style_template=self.system_style.pk))
 
         export_job = ExportJob.objects.get(project=self.project)
@@ -262,7 +269,7 @@ class ExportJobTests(TestCase):
     def test_user_can_use_own_style(self):
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay"):
+        with patch("apps.exports.job_services.enqueue_export"), self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(self.create_url(), self.export_payload(style_template=self.own_style.pk))
 
         export_job = ExportJob.objects.get(project=self.project)
@@ -305,7 +312,7 @@ class ExportJobTests(TestCase):
     def test_free_user_can_use_system_style(self):
         self.client.force_login(self.free_user)
 
-        with patch("apps.exports.views.generate_export_job.delay"):
+        with patch("apps.exports.job_services.enqueue_export"), self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
                 self.create_url(self.free_project),
                 self.export_payload(root_node=self.free_node.pk, style_template=self.system_style.pk),
@@ -323,10 +330,9 @@ class ExportJobTests(TestCase):
         self.assertEqual(
             choices,
             [
-                (ExportJob.ExportFormat.HTML, "HTML"),
+                (ExportJob.ExportFormat.MARKDOWN, "Markdown"),
                 (ExportJob.ExportFormat.DOCX, "DOCX"),
                 (ExportJob.ExportFormat.PDF, "PDF"),
-                (ExportJob.ExportFormat.EPUB, "EPUB"),
             ],
         )
 
@@ -475,16 +481,16 @@ class ExportJobTests(TestCase):
     def test_create_export_starts_as_pending(self):
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay"):
+        with patch("apps.exports.job_services.enqueue_export"), self.captureOnCommitCallbacks(execute=True):
             self.client.post(self.create_url(), self.export_payload())
 
         export_job = ExportJob.objects.get(project=self.project)
-        self.assertEqual(export_job.status, ExportJob.ExportStatus.PENDING)
+        self.assertEqual(export_job.status, ExportJob.ExportStatus.REQUESTED)
 
     def test_authenticated_user_can_create_docx_export_for_own_project(self):
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay") as delay:
+        with patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(self.create_url(), self.export_payload(format=ExportJob.ExportFormat.DOCX))
 
         export_job = ExportJob.objects.get(project=self.project)
@@ -495,7 +501,7 @@ class ExportJobTests(TestCase):
     def test_authenticated_user_can_create_pdf_export_for_own_project(self):
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay") as delay:
+        with patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(self.create_url(), self.export_payload(format=ExportJob.ExportFormat.PDF))
 
         export_job = ExportJob.objects.get(project=self.project)
@@ -503,19 +509,14 @@ class ExportJobTests(TestCase):
         self.assertEqual(export_job.format, ExportJob.ExportFormat.PDF)
         delay.assert_called_once_with(export_job.pk)
 
-    def test_authenticated_user_can_create_epub_export_for_own_project(self):
-        self.client.force_login(self.premium_user)
-
-        with patch("apps.exports.views.generate_export_job.delay") as delay:
-            response = self.client.post(self.create_url(), self.export_payload(format=ExportJob.ExportFormat.EPUB))
-
-        export_job = ExportJob.objects.get(project=self.project)
-        self.assertRedirects(response, self.detail_url(export_job))
+    def test_internal_service_can_create_epub_export_for_own_project(self):
+        with patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
+            export_job = self.make_job(user=self.premium_user, project=self.project, style_template=self.system_style, format="EPUB")
         self.assertEqual(export_job.format, ExportJob.ExportFormat.EPUB)
         delay.assert_called_once_with(export_job.pk)
 
     def test_task_generates_html_file_and_marks_done(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -525,12 +526,13 @@ class ExportJobTests(TestCase):
         generate_export_job.run(export_job.pk)
 
         export_job.refresh_from_db()
-        self.assertEqual(export_job.status, ExportJob.ExportStatus.DONE)
-        self.assertTrue(export_job.file.name.endswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}.html"))
+        self.assertEqual(export_job.status, ExportJob.ExportStatus.READY)
+        self.assertTrue(export_job.file.name.startswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}/"))
+        self.assertTrue(export_job.file.name.endswith(".html"))
         self.assertIn("<!doctype html>", self.export_html_for_job(export_job))
 
     def test_download_forces_html_attachment_with_embedded_css(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -549,7 +551,7 @@ class ExportJobTests(TestCase):
         self.assertIn("Libro raíz", content)
 
     def test_task_generates_docx_file_and_marks_done(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -560,13 +562,14 @@ class ExportJobTests(TestCase):
         generate_export_job.run(export_job.pk)
 
         export_job.refresh_from_db()
-        self.assertEqual(export_job.status, ExportJob.ExportStatus.DONE)
-        self.assertTrue(export_job.file.name.endswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}.docx"))
+        self.assertEqual(export_job.status, ExportJob.ExportStatus.READY)
+        self.assertTrue(export_job.file.name.startswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}/"))
+        self.assertTrue(export_job.file.name.endswith(".docx"))
         self.assertGreater(export_job.file.size, 0)
         self.assertIn("Libro raíz", self.export_docx_text_for_job(export_job))
 
     def test_download_forces_docx_attachment(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -585,7 +588,7 @@ class ExportJobTests(TestCase):
         self.assertGreater(len(content), 0)
 
     def test_task_generates_pdf_file_and_marks_done(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -597,13 +600,14 @@ class ExportJobTests(TestCase):
 
         export_job.refresh_from_db()
         pdf_content = self.export_pdf_bytes_for_job(export_job)
-        self.assertEqual(export_job.status, ExportJob.ExportStatus.DONE)
-        self.assertTrue(export_job.file.name.endswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}.pdf"))
+        self.assertEqual(export_job.status, ExportJob.ExportStatus.READY)
+        self.assertTrue(export_job.file.name.startswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}/"))
+        self.assertTrue(export_job.file.name.endswith(".pdf"))
         self.assertGreater(len(pdf_content), 0)
         self.assertTrue(pdf_content.startswith(b"%PDF"))
 
     def test_download_forces_pdf_attachment(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -623,7 +627,7 @@ class ExportJobTests(TestCase):
         self.assertTrue(content.startswith(b"%PDF"))
 
     def test_task_generates_epub_file_and_marks_done(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -635,8 +639,9 @@ class ExportJobTests(TestCase):
 
         export_job.refresh_from_db()
         epub_content = self.export_epub_bytes_for_job(export_job)
-        self.assertEqual(export_job.status, ExportJob.ExportStatus.DONE)
-        self.assertTrue(export_job.file.name.endswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}.epub"))
+        self.assertEqual(export_job.status, ExportJob.ExportStatus.READY)
+        self.assertTrue(export_job.file.name.startswith(f"exports/{self.premium_user.pk}/{self.project.pk}/{export_job.pk}/"))
+        self.assertTrue(export_job.file.name.endswith(".epub"))
         self.assertGreater(len(epub_content), 0)
         self.assertTrue(zipfile.is_zipfile(BytesIO(epub_content)))
         with zipfile.ZipFile(BytesIO(epub_content)) as epub_zip:
@@ -647,7 +652,7 @@ class ExportJobTests(TestCase):
             self.assertTrue(any(name.endswith(".xhtml") for name in names))
 
     def test_download_forces_epub_attachment(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
@@ -667,7 +672,7 @@ class ExportJobTests(TestCase):
         self.assertTrue(zipfile.is_zipfile(BytesIO(content)))
 
     def test_exporting_chapter_includes_its_scenes(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.chapter,
@@ -682,7 +687,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", html)
 
     def test_exporting_scene_only_includes_that_scene(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.scene,
@@ -697,7 +702,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", html)
 
     def test_docx_exporting_chapter_includes_its_scenes(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.chapter,
@@ -713,7 +718,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", text)
 
     def test_docx_exporting_scene_only_includes_that_scene(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.scene,
@@ -729,7 +734,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", text)
 
     def test_pdf_exporting_chapter_includes_its_scenes(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.chapter,
@@ -744,7 +749,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", html)
 
     def test_pdf_exporting_scene_only_includes_that_scene(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.scene,
@@ -759,7 +764,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", html)
 
     def test_epub_exporting_chapter_includes_its_scenes(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.chapter,
@@ -775,7 +780,7 @@ class ExportJobTests(TestCase):
         self.assertNotIn("Escena fuera del capítulo", text)
 
     def test_epub_exporting_scene_only_includes_that_scene(self):
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.scene,
@@ -792,7 +797,7 @@ class ExportJobTests(TestCase):
 
     def test_generated_html_does_not_include_notes(self):
         Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             style_template=self.system_style,
@@ -806,7 +811,7 @@ class ExportJobTests(TestCase):
 
     def test_generated_docx_does_not_include_notes(self):
         Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             style_template=self.system_style,
@@ -821,7 +826,7 @@ class ExportJobTests(TestCase):
 
     def test_generated_pdf_does_not_include_notes(self):
         Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             style_template=self.system_style,
@@ -835,7 +840,7 @@ class ExportJobTests(TestCase):
 
     def test_generated_epub_does_not_include_notes(self):
         Note.objects.create(project=self.project, title="Nota secreta", content="Contenido interno de nota")
-        export_job = ExportJob.objects.create(
+        export_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             style_template=self.system_style,
@@ -851,13 +856,13 @@ class ExportJobTests(TestCase):
     def test_list_only_shows_exports_for_current_project(self):
         second_project = Project.objects.create(user=self.premium_user, name="Segundo proyecto")
         second_node = ManuscriptNode.objects.create(project=second_project, title="Nodo de segundo proyecto")
-        own_job = ExportJob.objects.create(
+        own_job = self.make_job(
             user=self.premium_user,
             project=self.project,
             root_node=self.book,
             style_template=self.system_style,
         )
-        ExportJob.objects.create(
+        self.make_job(
             user=self.premium_user,
             project=second_project,
             root_node=second_node,
@@ -893,7 +898,7 @@ class ExportJobTests(TestCase):
         )
         self.client.force_login(self.premium_user)
 
-        with patch("apps.exports.views.generate_export_job.delay") as delay:
+        with patch("apps.exports.job_services.enqueue_export") as delay, self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(self.create_url(pending_project), self.export_payload())
 
         job = ExportJob.objects.get(project=pending_project)

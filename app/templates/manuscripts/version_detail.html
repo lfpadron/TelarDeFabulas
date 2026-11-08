@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}V{{ version.version_number }} | {{ scene.display_title }}{% endblock %}
+{% block content %}
+<section class="panel scene-version">
+    <h1>{{ scene.display_title }}: V{{ version.version_number }}</h1>
+    {{ action_form.non_field_errors }}{{ action_form.revision.errors }}
+    <p>{{ version.get_editorial_stage_display }} | {% trans "Revisión" %}: {{ version.revision }} | {% trans "Palabras" %}: {{ version.word_count }}</p>
+    {% if version.is_current_final %}<p><strong>{% trans "Definitiva vigente" %}</strong></p>{% endif %}
+    {% if draft.pk == version.pk %}<p>{% trans "Versión de trabajo" %}</p>{% endif %}
+    {% if version.based_on_id %}<p>{% trans "Basada en versión ID" %}: {{ version.based_on_id }}</p>{% endif %}
+    <p>{% trans "Creación" %}: {{ version.created_at }} | {% trans "Modificación" %}: {{ version.updated_at }}</p>
+    {% if version.finalized_at %}<p>{% trans "Finalización" %}: {{ version.finalized_at }}</p>{% endif %}
+    <div class="version-content" style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ version.content }}</div>
+    {% include "manuscripts/_version_actions.html" %}
+    <div class="actions">
+        <a href="{% url 'manuscripts:version_history' project.pk scene.pk %}">{% trans "Ver historial" %}</a>
+        <a href="{% url 'manuscripts:detail' project.pk scene.pk %}">{% trans "Volver a la escena" %}</a>
+    </div>
+</section>
+{% endblock %}

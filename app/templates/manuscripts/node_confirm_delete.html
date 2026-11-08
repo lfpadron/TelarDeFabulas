@@ -11,6 +11,9 @@
             Vas a borrar físicamente el nodo "{{ title }}". Esta acción no borra proyectos ni otros nodos.
         {% endblocktrans %}
     </p>
+    {% if node.node_type == 'SCENE' %}
+        <p class="warning-note">{% trans "También se eliminarán todas las versiones de esta escena, incluidas sus definitivas. Esta acción no se puede deshacer." %}</p>
+    {% endif %}
     <form method="post">
         {% csrf_token %}
         <button class="button warning" type="submit">{% trans "Sí, borrar nodo" %}</button>

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Editar" %} V{{ version.version_number }} | {{ scene.display_title }}{% endblock %}
+{% block content %}
+<section class="panel scene-version">
+    <h1>{{ scene.display_title }}: V{{ version.version_number }}</h1>
+    <p>{{ version.get_editorial_stage_display }}</p>
+    <form method="post" novalidate>
+        {% csrf_token %}{{ form.as_p }}
+        <div class="actions">
+            <button class="button" type="submit">{% trans "Guardar cambios" %}</button>
+            <a href="{% url 'manuscripts:version_detail' project.pk scene.pk version.pk %}" target="_blank" rel="noopener">{% trans "Ver versión guardada" %}</a>
+            <a href="{% url 'manuscripts:version_history' project.pk scene.pk %}">{% trans "Ver historial" %}</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -56,7 +56,7 @@ def can_export_project(user, project):
 def can_download_export(user, export_job):
     return bool(
         can_access_project(user, export_job.project, Action.DOWNLOAD)
-        and export_job.user_id == user.pk and export_job.status == "DONE" and export_job.file
+        and export_job.user_id == user.pk and export_job.downloadable
     )
 
 
@@ -97,7 +97,7 @@ def local_project_relations(queryset, project_path="project"):
                 Q(style_template__is_system=True)
                 | Q(style_template__user=F(f"{project_path}__user"))
             )
-        if field.name not in {"parent", "node", "root_node", "character"}:
+        if field.name not in {"parent", "node", "root_node", "character", "residence"}:
             continue
         queryset = queryset.filter(
             Q(**{f"{field.name}__isnull": True}) | Q(**{f"{field.name}__project": F(project_path)})
