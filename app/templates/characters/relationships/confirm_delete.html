@@ -1,0 +1,11 @@
+{% extends "characters/relationships/base.html" %}
+{% load i18n %}
+{% block relationship_content %}
+<h1>{% trans "Eliminar relación" %}</h1>
+<p>{% include "characters/relationships/_direction.html" %}: <strong>{{ relationship.type_label }}</strong></p>
+<p>{% trans "Esta acción no se puede deshacer. Los personajes y las demás relaciones se conservan." %}</p>
+<form method="post">{% csrf_token %}<div class="actions">
+<button class="button warning" type="submit">{% trans "Eliminar relación" %}</button>
+<a href="{% url 'characters:relationship_list' project.pk character.pk %}">{% trans "Cancelar" %}</a>
+</div></form>
+{% endblock %}

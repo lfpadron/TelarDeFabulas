@@ -1,10 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import models, router, transaction
-from django.db.models import Max
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.permissions import Action, check_project_permission, validate_project_action
+from apps.core import trees
 from apps.projects.models import Project
 
 from .models import GeographicLocation
@@ -26,64 +25,28 @@ def lock_project(project_id, *, using="default", user=None, action=Action.EDIT):
 
 def validate_parent(project, location_id, parent_id):
     parents = dict(_locations(project).values_list("pk", "parent_id"))
-    seen = {location_id} if location_id else set()
-    while parent_id is not None:
-        if parent_id in seen:
-            raise ValidationError({"parent": _("La ubicación no puede depender de sí misma ni de sus descendientes.")})
-        if parent_id not in parents:
-            raise ValidationError({"parent": _("El padre debe pertenecer al mismo proyecto.")})
-        seen.add(parent_id)
-        parent_id = parents[parent_id]
+    trees.validate_parent_chain(parents, location_id, parent_id,
+        _("La ubicación no puede depender de sí misma ni de sus descendientes."),
+        _("El padre debe pertenecer al mismo proyecto."))
 
 
 def get_valid_parent_queryset(project, location=None):
     if location is not None and location.project_id != project.pk:
         raise ValidationError(_("La ubicación debe pertenecer al proyecto actual."))
-    children = {}
-    for pk, parent_id in _locations(project).values_list("pk", "parent_id"):
-        children.setdefault(parent_id, []).append(pk)
-    excluded = set()
-    pending = [location.pk] if location and location.pk else []
-    while pending:
-        pk = pending.pop()
-        if pk not in excluded:
-            excluded.add(pk)
-            pending.extend(children.get(pk, ()))
+    excluded = trees.descendant_ids(_locations(project).values_list("pk", "parent_id"), location.pk if location else None)
     return _locations(project).exclude(pk__in=excluded).only("id", "name").order_by("name", "pk")
 
 
 def _siblings(project, parent_id, exclude_pk=None):
-    return list(_locations(project).filter(parent_id=parent_id).exclude(pk=exclude_pk)
-                .only("id", "position").order_by("position", "pk"))
-
-
-def _position(value, count):
-    if value in (None, ""):
-        return count + 1
-    try:
-        number = int(value)
-    except (ValueError, TypeError):
-        raise ValidationError(_("La posición debe ser un entero positivo.")) from None
-    if number < 1 or str(number) != str(value):
-        raise ValidationError(_("La posición debe ser un entero positivo."))
-    return min(number, count + 1)
+    return trees.siblings(_locations(project), parent_id, exclude_pk)
 
 
 def _park(project, rows):
-    # Free every affected slot before final numbering (including NULL/root siblings).
-    maximum = _locations(project).aggregate(value=Max("position"))["value"] or 0
-    for offset, row in enumerate(rows, start=1):
-        row.position = maximum + offset
-    if rows:
-        GeographicLocation.objects.using(project._state.db).bulk_update(rows, ["position"])
-    return maximum + len(rows) + 1
+    return trees.park_positions(_locations(project), rows)
 
 
 def _number(project, rows):
-    for position, row in enumerate(rows, start=1):
-        row.position = position
-    if rows:
-        GeographicLocation.objects.using(project._state.db).bulk_update(rows, ["position"])
+    return trees.number_positions(_locations(project), rows)
 
 
 def normalize_positions(project, parent=None, *, user=None):
@@ -109,33 +72,10 @@ def save_location(location, *args, **kwargs):
             existing = GeographicLocation.objects.using(using).select_for_update().get(pk=location.pk)
             if existing.project_id != project.pk:
                 raise ValidationError(_("No se permite trasladar ubicaciones a otro proyecto."))
-            loaded = getattr(location, "_loaded_structure", {})
-            for key in ("parent_id", "position"):
-                if fields is not None and key not in fields and key.removesuffix("_id") not in fields:
-                    setattr(location, key, getattr(existing, key))
-                elif key in loaded and getattr(location, key) == loaded[key]:
-                    setattr(location, key, getattr(existing, key))
-                elif key in loaded and getattr(existing, key) != loaded[key]:
-                    raise ValidationError(_("La ubicación fue movida. Recarga antes de cambiar su estructura."))
+            trees.preserve_current_structure(location, existing, fields,
+                _("La ubicación fue movida. Recarga antes de cambiar su estructura."))
         location.project = project
-        target = _siblings(project, location.parent_id, location.pk)
-        structural = existing is None or (existing.parent_id, existing.position) != (location.parent_id, location.position)
-        location.position = _position(location.position, len(target)) if structural else existing.position
-        location.full_clean(validate_constraints=False)
-        if structural:
-            source = _siblings(project, existing.parent_id, location.pk) if existing and existing.parent_id != location.parent_id else []
-            index = location.position - 1
-            parked = target + source + ([existing] if existing else [])
-            location.position = _park(project, parked)
-        if fields is not None:
-            kwargs["update_fields"] = set(fields) | {"position"}
-        result = models.Model.save(location, *args, **kwargs)
-        if structural:
-            target.insert(index, location)
-            _number(project, target)
-            _number(project, source)
-        location._loaded_structure = {key: getattr(location, key) for key in ("parent_id", "position")}
-        return result
+        return trees.save_ordered_node(location, existing, *args, **kwargs)
 
 
 def _locked_location(location, user=None, action=Action.EDIT):
@@ -148,19 +88,7 @@ def _locked_location(location, user=None, action=Action.EDIT):
 def _move_locked(location, parent, new_position):
     parent_id = parent.pk if parent else None
     validate_parent(location.project, location.pk, parent_id)
-    source = _siblings(location.project, location.parent_id, location.pk)
-    target = source if location.parent_id == parent_id else _siblings(location.project, parent_id, location.pk)
-    index = _position(new_position, len(target)) - 1
-    _park(location.project, source + ([] if source is target else target) + [location])
-    location.parent_id = parent_id
-    location.updated_at = timezone.now()
-    _locations(location.project).filter(pk=location.pk).update(parent_id=parent_id, updated_at=location.updated_at)
-    target.insert(index, location)
-    _number(location.project, target)
-    if source is not target:
-        _number(location.project, source)
-    location.refresh_from_db()
-    return location
+    return trees.move_ordered_node(_locations(location.project), location, parent_id, new_position)
 
 
 def move_location(location, new_parent, new_position=None, *, user=None):
@@ -191,6 +119,8 @@ def deletion_blockers(location):
         reasons.append(_("No puedes eliminar una ubicación con ubicaciones hijas."))
     if location.residents.exists():
         reasons.append(_("No puedes eliminar una ubicación con personajes habitantes. Cambia o retira su residencia primero."))
+    if location.headquartered_organizations.exists():
+        reasons.append(_("No puedes eliminar una ubicación que es sede de organizaciones. Cambia o retira sus sedes primero."))
     return reasons
 
 

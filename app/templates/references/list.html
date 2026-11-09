@@ -1,0 +1,24 @@
+{% extends "references/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{% trans "Referencias y materiales" %} | {{ project.name }}{% endblock %}
+{% block references_content %}
+{% project_permissions project as access %}
+<h1>{% trans "Referencias y materiales" %}</h1>
+{% if access.edit %}<p><a class="button" href="{% url 'references:create' project.pk %}">{% trans "Nueva referencia" %}</a></p>{% endif %}
+<p class="ref-meta">{% trans "Almacenamiento utilizado" %}: {{ storage_bytes|filesizeformat }}</p>
+<form method="get" class="ref-filters">
+    {{ filter_form.as_p }}
+    <div class="actions"><button class="button" type="submit">{% trans "Buscar" %}</button><a href="{% url 'references:list' project.pk %}">{% trans "Limpiar" %}</a></div>
+</form>
+{% for reference in page %}
+<article class="ref-row">
+    <div><h2><a href="{% url 'references:detail' project.pk reference.pk %}">{{ reference.title }}</a></h2>
+    <p>{{ reference.get_material_type_display }}{% if reference.author %} · {{ reference.author }}{% endif %}</p>
+    <p class="ref-meta">{% trans "Actualizada" %}: {{ reference.updated_at|date:"SHORT_DATETIME_FORMAT" }} · {% trans "Asociaciones" %}: {{ reference.association_count }}</p></div>
+    <div class="actions"><a href="{% url 'references:detail' project.pk reference.pk %}">{% trans "Ver" %}</a>
+    {% if reference.file %}<a href="{% url 'references:download' project.pk reference.pk %}">{% trans "Descargar" %}</a>{% endif %}
+    {% if access.edit %}<a href="{% url 'references:edit' project.pk reference.pk %}">{% trans "Editar" %}</a><a href="{% url 'references:delete' project.pk reference.pk %}">{% trans "Eliminar" %}</a>{% endif %}</div>
+</article>
+{% empty %}<p>{% trans "No hay referencias que mostrar." %}</p>{% endfor %}
+{% include "references/_pagination.html" %}
+{% endblock %}

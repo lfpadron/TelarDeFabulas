@@ -1,0 +1,17 @@
+{% extends "worldbuilding/base.html" %}
+{% load i18n %}
+{% block title %}{{ title }} | {{ project.name }}{% endblock %}
+{% block worldbuilding_content %}
+<h1>{{ title }}</h1>
+{% if conflict %}
+<div class="warning-note" role="alert">
+    <p>{% trans "Tus cambios no se guardaron y siguen en este formulario. La entrada más reciente permanece intacta." %}</p>
+    <a href="{% url 'worldbuilding:edit' project.pk entry.pk %}" target="_blank" rel="noopener">{% trans "Abrir revisión actual en otra pestaña" %}</a>
+</div>
+{% endif %}
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions"><button class="button" type="submit">{% trans "Guardar" %}</button><a href="{{ return_url }}">{% trans "Cancelar" %}</a></div>
+</form>
+{% endblock %}

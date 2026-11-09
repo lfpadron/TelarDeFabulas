@@ -1,0 +1,21 @@
+{% extends "worldbuilding/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{{ entry.title }} | {{ project.name }}{% endblock %}
+{% block worldbuilding_content %}
+{% project_permissions project as access %}
+<p><a href="{% url 'worldbuilding:list' project.pk %}?category={{ entry.category }}">{{ entry.get_category_display }}</a></p>
+<h1>{{ entry.title }}</h1>
+{% if entry.short_description %}<h2>{% trans "Descripción breve" %}</h2><div class="world-text">{{ entry.short_description }}</div>{% endif %}
+<h2>{% trans "Contenido" %}</h2>
+{% if entry.content %}<div class="world-text">{{ entry.content }}</div>{% else %}<p>{% trans "Sin contenido todavía." %}</p>{% endif %}
+<p class="muted">{% trans "Creado" %}: {{ entry.created_at|date:"SHORT_DATETIME_FORMAT" }}<br>{% trans "Última modificación" %}: {{ entry.updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+<div class="actions">
+    <a class="button secondary" href="{% url 'worldbuilding:list' project.pk %}">{% trans "Volver a construcción de mundos" %}</a>
+    {% if access.edit %}
+        <a class="button" href="{% url 'worldbuilding:edit' project.pk entry.pk %}">{% trans "Editar" %}</a>
+        <a class="button" href="{% url 'worldbuilding:change_category' project.pk entry.pk %}">{% trans "Cambiar categoría" %}</a>
+        <a class="button warning" href="{% url 'worldbuilding:delete' project.pk entry.pk %}">{% trans "Eliminar" %}</a>
+    {% endif %}
+</div>
+{% load references %}{% reference_section project entry %}
+{% endblock %}

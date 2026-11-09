@@ -1,0 +1,48 @@
+{% extends "worldbuilding/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{% trans "Construcción de mundos" %} | {{ project.name }}{% endblock %}
+{% block worldbuilding_content %}
+{% project_permissions project as access %}
+<h1>{% trans "Construcción de mundos" %}</h1>
+{% if access.edit %}<div class="actions"><a class="button" href="{% url 'worldbuilding:create' project.pk %}">{% trans "Nueva entrada" %}</a></div>{% endif %}
+<form method="get" class="world-filters">
+    {{ filter_form.non_field_errors }}
+    <p>{{ filter_form.q.label_tag }}{{ filter_form.q }}{{ filter_form.q.errors }}</p>
+    <p>{{ filter_form.category.label_tag }}{{ filter_form.category }}{{ filter_form.category.errors }}</p>
+    <div class="actions"><button class="button" type="submit">{% trans "Buscar" %}</button><a href="{% url 'worldbuilding:list' project.pk %}">{% trans "Limpiar" %}</a></div>
+</form>
+{% for section in sections %}
+<section class="world-section" aria-labelledby="heading-{{ section.category }}">
+    <div class="world-section-header">
+        <h2 id="heading-{{ section.category }}">{{ section.label }}</h2>
+        {% if access.edit %}<a href="{% url 'worldbuilding:create' project.pk %}?category={{ section.category }}">{% trans "Nueva entrada" %}</a>{% endif %}
+    </div>
+    {% for entry in section.page %}
+    <article class="world-entry">
+        <div>
+            <h3><a href="{% url 'worldbuilding:detail' project.pk entry.pk %}">{{ entry.title }}</a></h3>
+            {% if entry.short_description %}<p class="world-text">{{ entry.short_description }}</p>{% endif %}
+            <time datetime="{{ entry.updated_at|date:'c' }}">{% trans "Actualizada" %}: {{ entry.updated_at|date:"SHORT_DATETIME_FORMAT" }}</time>
+        </div>
+        <div class="actions">
+            <a href="{% url 'worldbuilding:detail' project.pk entry.pk %}">{% trans "Ver" %}</a>
+            {% if access.edit %}
+                <a href="{% url 'worldbuilding:edit' project.pk entry.pk %}">{% trans "Editar" %}</a>
+                <a href="{% url 'worldbuilding:change_category' project.pk entry.pk %}">{% trans "Cambiar categoría" %}</a>
+                <a href="{% url 'worldbuilding:delete' project.pk entry.pk %}">{% trans "Eliminar" %}</a>
+                <span class="world-order">
+                    {% if entry.can_move_up %}<form method="post" action="{% url 'worldbuilding:move_up' project.pk entry.pk %}">{% csrf_token %}<input type="hidden" name="expected_revision" value="{{ entry.revision }}"><button class="button secondary" type="submit" title="{% trans 'Subir' %}" aria-label="{% trans 'Subir' %}">&#8593;</button></form>{% endif %}
+                    {% if entry.can_move_down %}<form method="post" action="{% url 'worldbuilding:move_down' project.pk entry.pk %}">{% csrf_token %}<input type="hidden" name="expected_revision" value="{{ entry.revision }}"><button class="button secondary" type="submit" title="{% trans 'Bajar' %}" aria-label="{% trans 'Bajar' %}">&#8595;</button></form>{% endif %}
+                </span>
+            {% endif %}
+        </div>
+    </article>
+    {% empty %}<p>{% trans "No hay entradas que mostrar en esta categoría." %}</p>{% endfor %}
+    {% if section.page.has_other_pages %}<div class="world-pagination">
+        {% if section.page.has_previous %}<a href="?{{ section.page_query }}&{{ section.page_key }}={{ section.page.previous_page_number }}">{% trans "Anterior" %}</a>{% endif %}
+        <span>{% blocktrans with current=section.page.number total=section.page.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
+        {% if section.page.has_next %}<a href="?{{ section.page_query }}&{{ section.page_key }}={{ section.page.next_page_number }}">{% trans "Siguiente" %}</a>{% endif %}
+    </div>{% endif %}
+</section>
+{% endfor %}
+{% endblock %}

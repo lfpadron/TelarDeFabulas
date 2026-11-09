@@ -1,0 +1,4 @@
+{% load i18n %}
+<a href="{% url 'characters:detail' project.pk relationship.source_character_id %}">{{ relationship.source_character.name }}</a>
+{% if relationship.is_reciprocal %}<span aria-label="{% trans 'Relación recíproca' %}">&harr;</span>{% else %}<span aria-label="{% trans 'Hacia' %}">&rarr;</span>{% endif %}
+<a href="{% url 'characters:detail' project.pk relationship.target_character_id %}">{{ relationship.target_character.name }}</a>

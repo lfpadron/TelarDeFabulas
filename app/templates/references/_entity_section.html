@@ -1,0 +1,24 @@
+{% load i18n project_permissions %}
+{% if project %}
+{% project_permissions project as access %}
+<section style="margin-top:2rem;overflow-wrap:anywhere">
+<h2>{% trans "Referencias y materiales" %}</h2>
+{% if access.edit %}<div class="actions">
+<a href="{% url 'references:associate' project.pk %}?{{ entity_query }}">{% trans "Asociar referencia existente" %}</a>
+<a href="{% url 'references:create' project.pk %}?{{ entity_query }}">{% trans "Crear nueva referencia" %}</a>
+</div>{% endif %}
+{% for association in reference_page %}
+<div style="padding:1rem 0;border-bottom:1px solid #cbd3ce">
+<p><strong>{{ association.reference.title }}</strong> · {{ association.reference.get_material_type_display }}</p>
+{% if association.description %}<p>{{ association.description }}</p>{% endif %}
+<div class="actions"><a href="{% url 'references:detail' project.pk association.reference_id %}">{% trans "Ver referencia" %}</a>
+{% if access.edit %}<a href="{% url 'references:detach' project.pk association.pk %}?return_to=entity">{% trans "Desvincular" %}</a>{% endif %}</div>
+</div>
+{% empty %}<p>{% trans "Sin referencias vinculadas." %}</p>{% endfor %}
+{% if reference_page.has_other_pages %}<div class="actions">
+{% if reference_page.has_previous %}<a href="{% querystring references_page=reference_page.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
+<p>{% blocktrans with current=reference_page.number total=reference_page.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</p>
+{% if reference_page.has_next %}<a href="{% querystring references_page=reference_page.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
+</div>{% endif %}
+</section>
+{% endif %}

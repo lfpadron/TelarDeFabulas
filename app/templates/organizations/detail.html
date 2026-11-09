@@ -1,0 +1,37 @@
+{% extends "organizations/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{{ organization.name }} | {{ project.name }}{% endblock %}
+{% block organizations_content %}
+{% project_permissions project as access %}
+<h1>{{ organization.name }}</h1>
+<nav aria-label="{% trans 'Ruta jerárquica' %}"><ol class="geo-path">{% for ancestor in path %}<li><a href="{% url 'organizations:detail' project.pk ancestor.pk %}">{{ ancestor.name }}</a></li>{% endfor %}</ol></nav>
+<p><strong>{% trans "Tipo" %}:</strong> {{ organization.type_label }}</p>
+<p><strong>{% trans "Organización superior" %}:</strong>
+    {% if organization.parent_id %}<a href="{% url 'organizations:detail' project.pk organization.parent_id %}">{{ path|slice:"-2:-1"|first }}</a>{% else %}{% trans "Sin organización superior" %}{% endif %}
+</p>
+<p><strong>{% trans "Sede principal" %}:</strong>
+    {% if organization.headquarters_id %}<a href="{% url 'geography:detail' project.pk organization.headquarters_id %}">{{ organization.headquarters.name }}</a>{% else %}{% trans "Sin sede registrada" %}{% endif %}
+</p>
+{% if organization.short_description %}<h2>{% trans "Descripción breve" %}</h2><p>{{ organization.short_description }}</p>{% endif %}
+{% if organization.detailed_description %}<h2>{% trans "Desarrollo detallado" %}</h2><div class="geo-text">{{ organization.detailed_description }}</div>{% endif %}
+<div class="actions">
+    <a class="button secondary" href="{% url 'organizations:tree' project.pk %}">{% trans "Volver a organizaciones" %}</a>
+    {% if access.edit %}
+        <a class="button" href="{% url 'organizations:create' project.pk %}?parent={{ organization.pk }}">{% trans "Crear subordinada" %}</a>
+        <a class="button" href="{% url 'organizations:edit' project.pk organization.pk %}">{% trans "Editar" %}</a>
+        <a class="button" href="{% url 'organizations:move' project.pk organization.pk %}">{% trans "Mover" %}</a>
+        <a class="button warning" href="{% url 'organizations:delete' project.pk organization.pk %}">{% trans "Eliminar" %}</a>
+    {% endif %}
+</div>
+<h2>{% trans "Organizaciones subordinadas" %}</h2>
+<ul>{% for child in children %}<li><a href="{% url 'organizations:detail' project.pk child.pk %}">{{ child.name }}</a> · {{ child.type_label }}</li>{% empty %}<li>{% trans "Sin organizaciones subordinadas." %}</li>{% endfor %}</ul>
+{% if children.has_other_pages %}<div class="geo-pagination">
+    {% if children.has_previous %}<a href="{% querystring children_page=children.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
+    <span>{% blocktrans with current=children.number total=children.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
+    {% if children.has_next %}<a href="{% querystring children_page=children.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
+</div>{% endif %}
+<h2>{% trans "Integrantes" %}</h2>
+{% if access.edit %}<div class="actions"><a class="button" href="{% url 'organizations:membership_create' project.pk %}?organization={{ organization.pk }}&return_to=organization">{% trans "Agregar afiliación" %}</a></div>{% endif %}
+{% include "organizations/_memberships.html" with return_to="organization" %}
+{% load references %}{% reference_section project organization %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<style>
+    .worldbuilding { overflow-wrap: anywhere; }
+    .worldbuilding h1 { font-size: 1.8rem; }
+    .worldbuilding h2 { font-size: 1.25rem; }
+    .worldbuilding h3 { font-size: 1.1rem; margin: 0; }
+    .worldbuilding .world-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .worldbuilding .world-filters { display: grid; grid-template-columns: minmax(0, 1fr) 12rem auto; align-items: end; gap: 1rem; margin: 1.5rem 0; }
+    .worldbuilding .world-filters p { margin: 0; }
+    .worldbuilding .world-section { margin-top: 2rem; }
+    .worldbuilding .world-section-header { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.5rem; border-bottom: 2px solid #aab8ae; }
+    .worldbuilding .world-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 18rem); gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #d4dcd7; }
+    .worldbuilding .world-entry p { margin: .5rem 0; }
+    .worldbuilding .world-entry time { font-size: .85rem; color: #485249; }
+    .worldbuilding .world-entry .actions { font-size: .9rem; }
+    .worldbuilding .world-order { display: inline-flex; gap: .25rem; }
+    .worldbuilding .world-order form { display: inline; margin: 0; }
+    .worldbuilding .world-order button { width: 34px; height: 34px; padding: 0; margin: 0; font-size: 1.1rem; }
+    .worldbuilding .world-pagination { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+    .worldbuilding input, .worldbuilding select, .worldbuilding textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
+    .worldbuilding .button { max-width: 100%; white-space: normal; }
+    @media (max-width: 640px) {
+        .worldbuilding .world-filters, .worldbuilding .world-entry { grid-template-columns: minmax(0, 1fr); }
+    }
+</style>
+<section class="worldbuilding">
+    <p><a href="{% url 'projects:detail' project.pk %}">{{ project.name }}</a></p>
+    {% block worldbuilding_content %}{% endblock %}
+</section>
+{% endblock %}

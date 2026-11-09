@@ -1,0 +1,9 @@
+{% extends "characters/relationships/base.html" %}
+{% load i18n %}
+{% block relationship_content %}
+<h1>{{ title }}</h1>
+<form method="post">{% csrf_token %}{{ form.as_p }}
+<div class="actions"><button class="button" type="submit">{% trans "Guardar relación" %}</button>
+<a href="{% url 'characters:relationship_list' project.pk character.pk %}">{% trans "Cancelar" %}</a></div>
+</form>
+{% endblock %}

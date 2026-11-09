@@ -26,18 +26,26 @@
 <ul>{% for child in children %}<li><a href="{% url 'geography:detail' project.pk child.pk %}">{{ child.name }}</a> · {{ child.type_label }}</li>{% empty %}<li>{% trans "Sin ubicaciones hijas." %}</li>{% endfor %}</ul>
 {% if children.has_other_pages %}
 <div class="geo-pagination">
-    {% if children.has_previous %}<a href="?children_page={{ children.previous_page_number }}&residents_page={{ residents.number }}">{% trans "Anterior" %}</a>{% endif %}
+    {% if children.has_previous %}<a href="{% querystring children_page=children.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
     <span>{% blocktrans with current=children.number total=children.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
-    {% if children.has_next %}<a href="?children_page={{ children.next_page_number }}&residents_page={{ residents.number }}">{% trans "Siguiente" %}</a>{% endif %}
+    {% if children.has_next %}<a href="{% querystring children_page=children.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
 </div>
 {% endif %}
 <h2>{% trans "Personajes habitantes" %}</h2>
 <ul>{% for resident in residents %}<li><a href="{% url 'characters:detail' project.pk resident.pk %}">{{ resident.name }}</a>{% if resident.alias %} ({{ resident.alias }}){% endif %}</li>{% empty %}<li>{% trans "Sin habitantes registrados." %}</li>{% endfor %}</ul>
 {% if residents.has_other_pages %}
 <div class="geo-pagination">
-    {% if residents.has_previous %}<a href="?residents_page={{ residents.previous_page_number }}&children_page={{ children.number }}">{% trans "Anterior" %}</a>{% endif %}
+    {% if residents.has_previous %}<a href="{% querystring residents_page=residents.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
     <span>{% blocktrans with current=residents.number total=residents.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
-    {% if residents.has_next %}<a href="?residents_page={{ residents.next_page_number }}&children_page={{ children.number }}">{% trans "Siguiente" %}</a>{% endif %}
+    {% if residents.has_next %}<a href="{% querystring residents_page=residents.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
 </div>
 {% endif %}
+<h2>{% trans "Organizaciones con sede aquí" %}</h2>
+<ul>{% for organization in organizations %}<li><a href="{% url 'organizations:detail' project.pk organization.pk %}">{{ organization.name }}</a> · {{ organization.type_label }}</li>{% empty %}<li>{% trans "Sin sedes registradas." %}</li>{% endfor %}</ul>
+{% if organizations.has_other_pages %}<div class="geo-pagination">
+    {% if organizations.has_previous %}<a href="{% querystring organizations_page=organizations.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
+    <span>{% blocktrans with current=organizations.number total=organizations.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
+    {% if organizations.has_next %}<a href="{% querystring organizations_page=organizations.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
+</div>{% endif %}
+{% load references %}{% reference_section project location %}
 {% endblock %}

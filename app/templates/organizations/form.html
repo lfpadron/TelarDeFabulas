@@ -1,0 +1,13 @@
+{% extends "organizations/base.html" %}
+{% load i18n %}
+{% block title %}{{ title }} | {{ project.name }}{% endblock %}
+{% block organizations_content %}
+<h1>{{ title }}</h1>
+{% if organization %}<p>{{ organization.name }}</p>{% endif %}
+<form method="post">
+    {% csrf_token %}
+    {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
+    {{ form.as_p }}
+    <div class="actions"><button class="button" type="submit">{% trans "Guardar" %}</button><a href="{{ return_url }}">{% trans "Cancelar" %}</a></div>
+</form>
+{% endblock %}

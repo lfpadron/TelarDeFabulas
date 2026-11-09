@@ -6,8 +6,8 @@ from django.test import TransactionTestCase
 class GeographyMigrationTests(TransactionTestCase):
     def test_additive_schema_preserves_existing_characters(self):
         latest = MigrationExecutor(connection).loader.graph.leaf_nodes()
-        old = [target for target in latest if target[0] not in ("geography", "characters")]
-        old += [("geography", None), ("characters", "0002_validate_private_images")]
+        old = [target for target in latest if target[0] not in ("geography", "characters", "organizations", "references")]
+        old += [("organizations", None), ("geography", None), ("characters", "0002_validate_private_images")]
         self.addCleanup(lambda: MigrationExecutor(connection).migrate(latest))
         executor = MigrationExecutor(connection)
         executor.migrate(old)

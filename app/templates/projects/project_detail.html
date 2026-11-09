@@ -32,6 +32,9 @@
         <a class="button" href="{% url 'manuscripts:tree' project.pk %}">{% trans "Manuscrito" %}</a>
         <a class="button" href="{% url 'characters:list' project.pk %}">{% trans "Índice de personajes" %}</a>
         <a class="button" href="{% url 'geography:tree' project.pk %}">{% trans "Geografía" %}</a>
+        <a class="button" href="{% url 'organizations:tree' project.pk %}">{% trans "Organizaciones" %}</a>
+        <a class="button" href="{% url 'worldbuilding:list' project.pk %}">{% trans "Construcción de mundos" %}</a>
+        <a class="button" href="{% url 'references:list' project.pk %}">{% trans "Referencias y materiales" %}</a>
         <a class="button" href="{% url 'notes:list' project.pk %}">{% trans "Notas, ideas y pendientes" %}</a>
         <a class="button" href="{% url 'exports:list' project.pk %}">{% trans "Exportaciones" %}</a>
         {% if access.edit %}

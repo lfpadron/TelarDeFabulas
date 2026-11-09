@@ -985,6 +985,7 @@ Docker. Cambiar el prefijo a `docker compose` permite usar Docker sin cambiar YA
         ├── manuscripts/
         ├── characters/
         ├── geography/
+        ├── organizations/
         ├── notes/
         ├── exports/
         ├── styles/
@@ -1009,8 +1010,9 @@ El campo **Habitante de** de la ficha de personaje es opcional y solo ofrece
 ubicaciones del mismo proyecto. Los enlaces funcionan en ambos sentidos:
 personaje -> residencia y ubicacion -> habitantes. Mover conserva ID,
 descripciones y habitantes. La edicion de descripcion no cambia el padre;
-usar **Mover** para reorganizar. Una ubicacion con hijos o habitantes no se
-elimina; primero mover los hijos y retirar/cambiar las residencias.
+usar **Mover** para reorganizar. Una ubicacion con hijos, habitantes o sedes de
+organizaciones no se elimina; primero mover los hijos y retirar/cambiar las
+residencias y sedes.
 
 Solo el propietario accede. ACTIVE permite escribir; FROZEN y PENDING_DELETION
 son de lectura; DELETED devuelve 404. El admin conserva este aislamiento,
@@ -1037,11 +1039,308 @@ Modelo, inventario de archivos, comandos, respaldo y limites en
 [13-geography-validation.md](docs/refactoring/13-geography-validation.md).
 Por ahora solo existe residencia principal; el historial queda para otra fase.
 
+## Organizaciones y afiliaciones (F6.2)
+
+Desde el detalle del proyecto, abrir **Organizaciones**:
+
+```text
+/projects/<project_pk>/organizations/
+```
+
+Organizaciones raiz o subordinadas con un padre principal opcional, nueve tipos,
+descripcion breve y desarrollo detallado. OTHER admite un tipo personalizado;
+al elegir otro tipo, ese campo se limpia. El arbol es colapsable; **Mover** cambia
+el padre o lleva a la raiz, y las flechas reordenan hermanas. Los movimientos
+conservan ID, descripciones, sede e integrantes y rechazan ciclos.
+
+La **Sede principal** es opcional y debe pertenecer al mismo proyecto. La ficha
+de la ubicacion muestra las organizaciones asentadas alli. No hay sedes multiples.
+
+La ficha de personaje incorpora **Afiliaciones**. Tambien se agregan desde
+**Integrantes** en una organizacion. Cada registro tiene cargo opcional, estado
+ACTIVE, FORMER, HONORARY, SUSPENDED o UNKNOWN, descripcion y fechas narrativas de
+ingreso/salida como texto libre. Un personaje puede tener varios cargos y
+organizaciones. Se rechaza la misma combinacion personaje/organizacion/cargo/
+estado/periodo; un periodo diferente permite otra afiliacion historica, sin
+crear un sistema cronologico de eventos.
+
+No se borran organizaciones con hijas o afiliaciones, incluidas las anteriores.
+Eliminar una afiliacion requiere confirmacion/POST/CSRF y conserva personaje y
+organizacion. Solo el propietario accede, tambien en admin: ACTIVE escribe,
+FROZEN/PENDING_DELETION leen, DELETED y usuarios ajenos reciben 404.
+
+Migracion aditiva: `organizations.0001_initial`. No modifica tablas anteriores ni
+necesita reset de PostgreSQL. Respaldar DB/media e inspeccionar el plan antes de
+actualizar otra instalacion. Para evitar peticiones durante la migracion, detener
+los escritores y usar un contenedor puntual:
+
+```powershell
+podman --connection telar-fabulas-dev compose stop web worker beat
+podman --connection telar-fabulas-dev compose run --rm --no-deps web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose run --rm --no-deps web python manage.py migrate
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py check
+podman --connection telar-fabulas-dev compose exec web python manage.py test apps.organizations apps.geography
+podman --connection telar-fabulas-dev compose exec web python manage.py test
+podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
+```
+
+F6.2 aprobo **721 pruebas**, incluidas 97 nuevas: 89 funcionales, siete carreras
+PostgreSQL y una de migracion. QA real HTTP/navegador escritorio/movil completado;
+datos temporales retirados y huellas originales identicas. Resultados,
+inventario de archivos, respaldo y limites de esta fase en
+[14-organizations-validation.md](docs/refactoring/14-organizations-validation.md).
+No hay dependencias nuevas ni cambios a uv, TUI, Chrome o exportadores.
+
+## Politica, religion e historia (F6.3)
+
+Desde el detalle del proyecto, abrir **Construccion de mundos**:
+
+```text
+/projects/<project_pk>/worldbuilding/
+```
+
+Entradas independientes en Politica, Religion e Historia. Cada una tiene titulo,
+descripcion breve opcional y contenido de texto plano, con saltos de linea
+conservados y HTML escapado. No hay jerarquia, cronologia automatica ni limite
+artificial de entradas. El listado busca por titulo/descripcion, filtra por
+categoria y pagina a 50 entradas por seccion, sin cargar contenido extenso.
+
+**Nueva entrada**, **Editar**, flechas **Subir/Bajar** y **Cambiar categoria**
+conservan identidad y texto. El orden es relativo a proyecto/categoria y usa
+posiciones contiguas desde cero. Cambiar categoria agrega al final del destino
+y normaliza ambos grupos bajo bloqueo transaccional del proyecto.
+
+Cada entrada tiene una revision, inicialmente 1. Editar, mover o renumerar una
+fila incrementa su revision; guardar sin cambios no la incrementa. Los formularios
+envian la revision original. Un conflicto devuelve HTTP 409 sin sobrescribir el
+registro y mantiene el texto enviado en el formulario; se puede abrir la revision
+actual en otra pestana para comparar y conciliar. No hay fusion automatica ni
+historial completo. El admin usa el mismo servicio y control de concurrencia.
+
+**Eliminar** exige confirmacion, POST, CSRF y revision vigente. Solo elimina esa
+entrada y normaliza su categoria. No hay papelera ni recuperacion automatica;
+estas requieren una politica posterior. Para evitar un borrado administrativo
+sin revision, el admin no ofrece borrado individual ni masivo: usar la pantalla
+del autor. `QuerySet.update`, `bulk_*`, `QuerySet.delete` y SQL directo son APIs
+privilegiadas y no deben exponerse como escritores de negocio.
+
+Solo el propietario accede, sin excepcion por ser administrador. ACTIVE permite
+modificar; FROZEN/PENDING_DELETION solo leer; DELETED y usuarios ajenos reciben 404.
+UI preparada para es-MX/en-US, sin traducir automaticamente el texto del autor.
+
+Migracion aditiva: `worldbuilding.0001_initial`. Solo crea una tabla, constraints
+e indices; no modifica datos anteriores. Respaldar DB/media y revisar el plan
+antes de actualizar otra instalacion. No revertir a zero una tabla con contenido.
+
+```powershell
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py check
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate
+podman --connection telar-fabulas-dev compose exec web python manage.py test apps.worldbuilding --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py test --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
+podman --connection telar-fabulas-dev compose ps
+```
+
+En esta fase se usa `--keepdb`: la base de pruebas separada se conserva, sin
+borrar ninguna base ni volumen. No usar `down -v` ni reinicializar PostgreSQL.
+En una instalacion con usuarios concurrentes, suspender trafico de escritura
+durante la migracion; los comandos de desarrollo anteriores no son un despliegue
+de produccion sin interrupciones.
+
+F6.3 aprobo **809 pruebas**, 88 nuevas: 79 funcionales, ocho carreras reales en
+PostgreSQL y una de migracion. Evidencia de QA de escritorio/movil, inventario y
+riesgos en [15-worldbuilding-validation.md](docs/refactoring/15-worldbuilding-validation.md).
+Sin nuevas dependencias ni cambios a uv, TUI, Chrome, exportadores o reglas comerciales.
+
+## Referencias y materiales (F6.4)
+
+Desde el detalle del proyecto, abrir **Referencias y materiales**:
+
+```text
+/projects/<project_pk>/references/
+```
+
+Bibliografia, enlaces, imagenes, documentos y otros materiales. Se pueden crear,
+editar, buscar por titulo/descripcion/autor/editorial, filtrar por tipo y eliminar
+con confirmacion. El listado y los vinculos paginan a 50. El texto se escapa y
+conserva sus saltos de linea. Bibliografia y Otro pueden existir sin archivo;
+Enlace requiere HTTP/HTTPS; Imagen y Documento requieren un archivo compatible.
+
+Una referencia pertenece a un solo proyecto, pero puede vincularse a varios
+nodos del manuscrito, personajes, ubicaciones, organizaciones y entradas de
+construccion de mundos. Sus fichas muestran **Referencias y materiales** con
+**Ver referencia**, **Asociar referencia existente**, **Crear nueva referencia**
+y **Desvincular**. Asociar no copia el archivo; desvincular o borrar la entidad
+conserva la referencia. No se permiten vinculos entre proyectos, ni del mismo
+autor, ni duplicados exactos.
+
+Archivos privados bajo `PRIVATE_MEDIA_ROOT/references/<project_id>/<uuid>.<ext>`.
+Sin URLs publicas ni rutas fisicas en formularios/admin. Descargar requiere
+sesion y propiedad del proyecto; siempre entrega un adjunto con cache privada,
+incluidas imagenes, sin sustituir la pagina por el documento. Los enlaces
+externos solo admiten HTTP/HTTPS y nunca se descargan automaticamente.
+
+Formatos: JPEG/PNG/WebP verificados por Pillow; PDF con firma/estructura basica
+verificadas por pypdf; DOCX con ZIP/OOXML, CRC y limites de descompresion; TXT/MD
+en UTF-8. Se rechazan vacios, corruptos, extensiones incompatibles, nombres
+peligrosos, formatos ejecutables, HTML/SVG y documentos cifrados o con macros.
+MIME y tamano proceden de los bytes, no de lo declarado por el navegador.
+La validacion no es un antivirus ni garantiza que un documento descargado sea
+inofensivo al abrirlo con software externo.
+
+Limites en `.env` (MiB, valores enteros positivos):
+
+```env
+REFERENCE_IMAGE_MAX_MB=10
+REFERENCE_DOCUMENT_MAX_MB=20
+REFERENCE_PROJECT_STORAGE_MAX_MB=500
+```
+
+La cuota suma archivos de referencias vigentes y pendientes de limpieza de ese
+proyecto. Subidas concurrentes se serializan bajo bloqueo de Project. Un reemplazo
+necesita espacio para ambos archivos hasta confirmar y limpiar el anterior.
+Estas son cuotas tecnicas de referencias, no limites comerciales ni un cupo
+compartido con imagenes de personajes/exportaciones. Recrear web/worker/beat
+despues de cambiar variables de entorno.
+
+Cada guardado usa la revision original. Si otro formulario gano, HTTP 409
+conserva los textos enviados sin sobrescribir; un archivo rechazado debe volver
+a seleccionarse. El nuevo archivo se escribe antes del commit; el anterior se
+borra solo despues. Los fallos de borrado quedan registrados y Celery Beat
+programa reintentos cada minuto con espera creciente. No hay papelera.
+
+Comandos de limpieza controlada:
+
+```powershell
+podman --connection telar-fabulas-dev compose exec web python manage.py cleanup_reference_files
+# Solo huerfanos UUID de referencias, sin registro y con antiguedad minima de 24 h:
+podman --connection telar-fabulas-dev compose exec web python manage.py cleanup_reference_files --orphans
+```
+
+El segundo comando es explicito para reconciliar caidas de proceso o rollbacks
+externos; no recorre ni borra exportaciones, imagenes de personajes o fuentes.
+Supervisar la cola de limpieza y respaldar DB/media antes de mantenimiento.
+
+Permisos centrales, tambien en admin: ACTIVE permite escribir;
+FROZEN/PENDING_DELETION permiten consulta/descarga, no cambios; DELETED y usuarios
+ajenos reciben 404. Ni BUSINESS_ADMIN ni TECH_ADMIN acceden al contenido ajeno.
+Confirmaciones de borrado via POST/CSRF y revision. El admin de referencias no
+ofrece borrado directo/masivo; usar la confirmacion del autor.
+
+Migracion aditiva `references.0001_initial`: materiales, asociaciones y cola
+tecnica de limpieza, sin cambios a tablas anteriores. Dependencia nueva pypdf,
+resuelta con uv en `uv.lock`. No requiere reset de PostgreSQL.
+
+```powershell
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py check
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate
+podman --connection telar-fabulas-dev compose exec web python manage.py test apps.references --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py test --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
+podman --connection telar-fabulas-dev compose ps
+```
+
+En instalaciones con trafico, respaldar DB/media y detener escritores antes de
+migrar: usar `compose build web worker beat`, `compose stop web worker beat` y
+`compose run --rm --no-deps web python manage.py migrate --plan` / `migrate`;
+despues `compose up -d`. Nunca `down -v`, ni borrar bases, ni revertir una tabla
+con materiales a zero. Los backups anteriores no contienen contenido posterior.
+
+F6.4 aprobo **911 pruebas**, 102 nuevas, incluidas diez de concurrencia PostgreSQL
+y una de migracion. QA real: carga/descarga desde navegador, tres asociaciones
+con un solo archivo, reemplazo movil, desvinculacion, permisos y borrado seguro.
+Datos temporales retirados, originales verificados por SHA-256. Inventario,
+comandos, resultados y riesgos en
+[16-references-validation.md](docs/refactoring/16-references-validation.md).
+
+## Relaciones entre personajes (F7)
+
+En la ficha de un personaje, abrir **Relaciones** o **Agregar relacion**.
+Se preselecciona el origen; ambos selectores solo admiten personajes del proyecto
+actual. El listado separa relaciones salientes, entrantes y mutuas, con direccion
+explicita y enlaces a ambas fichas. Cada grupo pagina a 50; la descripcion completa
+se consulta en **Ver relacion**, sin cargar textos extensos en los listados.
+
+Tipos: FRIEND, ENEMY, RIVAL, FAMILY, PARENT, CHILD, SIBLING, ROMANTIC_INTEREST,
+PARTNER, MENTOR, STUDENT, ALLY, TRUST, DISTRUST y OTHER. OTHER requiere un tipo
+personalizado; cambiar a un tipo definido limpia ese campo. No se modifica el
+papel dramatico, la completitud, las menciones ni las afiliaciones del personaje.
+
+- Una relacion unilateral expresa solo origen -> destino.
+- Una reciproca se guarda en **un solo registro** y aparece en ambas fichas.
+- PARENT, CHILD, MENTOR y STUDENT no admiten reciprocidad.
+- No se crean relaciones inversas ni equivalencias semanticas automaticamente.
+- Origen/destino/tipo no se pueden repetir. Tipos diferentes si pueden coexistir.
+- Dos unilaterales opuestas son validas; si alguna es reciproca, no se permite
+  una segunda inversa del mismo tipo. Para convertir dos unilaterales en una
+  mutua, decidir cual conservar y eliminar la otra con confirmacion.
+- No hay autorrelaciones ni cruces entre proyectos, aunque tengan el mismo autor.
+
+Rutas:
+
+```text
+/projects/<project_pk>/characters/<character_pk>/relationships/
+/projects/<project_pk>/characters/<character_pk>/relationships/create/
+/projects/<project_pk>/relationships/<relationship_pk>/
+/projects/<project_pk>/relationships/<relationship_pk>/edit/
+/projects/<project_pk>/relationships/<relationship_pk>/delete/
+```
+
+Editar conserva el identificador. Eliminar requiere confirmacion, POST y CSRF;
+solo borra ese vinculo, nunca sus personajes ni otras relaciones. Eliminar un
+personaje elimina sus relaciones por CASCADE, sin borrar los otros personajes.
+El borrado es definitivo, sin papelera. Dos ediciones completas simultaneas
+siguen la regla de ultimo guardado gana: no hay revision optimista ni historial
+en este modelo. Los bloqueos protegen integridad y duplicados, no fusionan textos.
+
+Permisos centrales tambien en Django admin: ACTIVE permite escribir;
+FROZEN/PENDING_DELETION son de solo lectura; DELETED y autores ajenos reciben 404,
+incluidos administradores. El admin busca por nombres, filtra tipo/reciprocidad
+y valida ambos extremos. No ofrece borrado masivo de relaciones.
+
+Migracion aditiva `characters.0004_characterrelationship`: solo tabla, indices
+y restricciones nuevas, sin modificar datos anteriores. No necesita reiniciar
+PostgreSQL ni borrar volumenes. Sin dependencias, servicios o cambios de uv nuevos.
+
+```powershell
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py check
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate
+podman --connection telar-fabulas-dev compose exec web python manage.py test apps.characters.test_relationships apps.characters.test_relationship_concurrency apps.characters.test_relationship_migrations --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py test --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
+```
+
+En una instalacion con trafico, respaldar y detener web/worker/beat antes de
+migrar mediante `compose run --rm --no-deps web`, como en F6.4. No revertir esta
+migracion con relaciones guardadas ni restaurar una copia antigua como rollback
+rutinario; preservar datos y corregir hacia delante. No ejecutar suites simultaneas
+contra la misma base de pruebas; `--keepdb` la conserva.
+
+F7 aprobo **1005 pruebas integradas** y agrega 94: 83 funcionales, diez de
+concurrencia PostgreSQL y una de migracion aditiva. QA real en escritorio/movil con Rosariel, Fernaud y Arkan:
+direccion, reciprocidad, edicion, duplicados, permisos y eliminacion independiente.
+Datos temporales retirados; originales y media comprobados por SHA-256.
+Resultado integrado, inventario y limites en
+[17-character-relationships-validation.md](docs/refactoring/17-character-relationships-validation.md).
+
 ## Siguiente fase sugerida
 
-Continuar con F6.2: organizaciones y su aislamiento por proyecto. Geografia y
-residencia principal quedan implementadas en Prompt 08; organizaciones,
-entradas de mundo y referencias siguen pendientes, cada una con alcance propio.
+Continuar con **F8: exportacion de entidades**, definiendo primero la matriz de
+entidades/formatos, seleccion y politica de adjuntos privados. Reutilizar el
+selector y snapshots de exportacion existentes. Exportar relaciones requiere
+alcance aprobado en otra fase; F7 no lo implementa. Tampoco agrega grafos,
+cronologias, inferencias ni relaciones entre organizaciones.
 Suscripciones, comparacion visual y conversiones de FRAGMENT o texto legado
 requieren fases independientes. Antes de produccion faltan TLS, limites de
 recursos, monitorizacion, SMTP real y politica operativa de respaldos/cuotas.

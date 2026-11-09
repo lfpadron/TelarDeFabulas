@@ -1,0 +1,11 @@
+{% extends "organizations/base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Eliminar afiliación" %} | {{ project.name }}{% endblock %}
+{% block organizations_content %}
+<h1>{% trans "Eliminar afiliación" %}</h1>
+<p>{{ membership.character.name }} · {{ membership.organization.name }}</p>
+<p>{{ membership.position_title|default:"-" }} · {{ membership.get_membership_status_display }}</p>
+<p>{% trans "Se eliminará esta afiliación. El personaje y la organización se conservarán." %}</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="return_to" value="{{ return_to }}"><button class="button warning" type="submit">{% trans "Confirmar eliminación" %}</button></form>
+<p><a href="{{ return_url }}">{% trans "Cancelar" %}</a></p>
+{% endblock %}

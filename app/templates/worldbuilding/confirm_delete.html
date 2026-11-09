@@ -1,0 +1,9 @@
+{% extends "worldbuilding/base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Eliminar entrada" %} | {{ project.name }}{% endblock %}
+{% block worldbuilding_content %}
+<h1>{% trans "Eliminar entrada" %}</h1>
+<p>{% blocktrans with title=entry.title %}¿Eliminar «{{ title }}»? Esta acción no se puede deshacer.{% endblocktrans %}</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button class="button warning" type="submit">{% trans "Confirmar eliminación" %}</button></form>
+<p><a href="{% url 'worldbuilding:detail' project.pk entry.pk %}">{% trans "Volver a la entrada" %}</a></p>
+{% endblock %}

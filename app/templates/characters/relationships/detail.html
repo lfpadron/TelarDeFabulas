@@ -1,0 +1,15 @@
+{% extends "characters/relationships/base.html" %}
+{% load i18n project_permissions %}
+{% block relationship_content %}
+{% project_permissions project as access %}
+<h1>{{ relationship.type_label }}</h1>
+<p>{% include "characters/relationships/_direction.html" %}</p>
+<p>{% if relationship.is_reciprocal %}{% trans "Relación recíproca" %}{% else %}{% trans "Relación unilateral" %}{% endif %}</p>
+{% if relationship.description %}<h2>{% trans "Descripción" %}</h2><div class="relationship-description">{{ relationship.description }}</div>{% endif %}
+<p>{% trans "Creada" %}: {{ relationship.created_at|date:"SHORT_DATETIME_FORMAT" }}<br>{% trans "Actualizada" %}: {{ relationship.updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+<div class="actions">
+<a class="button secondary" href="{% url 'characters:relationship_list' project.pk character.pk %}">{% trans "Volver a relaciones" %}</a>
+{% if access.edit %}<a class="button" href="{% url 'characters:relationship_edit' project.pk relationship.pk %}?character={{ character.pk }}">{% trans "Editar relación" %}</a>
+<a class="button warning" href="{% url 'characters:relationship_delete' project.pk relationship.pk %}?character={{ character.pk }}">{% trans "Eliminar relación" %}</a>{% endif %}
+</div>
+{% endblock %}

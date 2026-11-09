@@ -1,0 +1,8 @@
+{% extends "references/base.html" %}
+{% load i18n %}
+{% block references_content %}
+<h1>{% trans "Desvincular referencia" %}</h1>
+<p>{% blocktrans with title=association.reference.title entity=association.entity %}¿Desvincular «{{ title }}» de «{{ entity }}»? La referencia y su archivo se conservan.{% endblocktrans %}</p>
+<form method="post">{% csrf_token %}<button class="button warning" type="submit">{% trans "Confirmar" %}</button></form>
+<p><a href="{{ return_url }}">{% trans "Cancelar" %}</a></p>
+{% endblock %}

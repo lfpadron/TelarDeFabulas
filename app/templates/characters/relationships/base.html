@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{{ character.name }} | {% trans "Relaciones" %} | {{ project.name }}{% endblock %}
+{% block content %}
+<style>
+    .relationship-content { overflow-wrap: anywhere; }
+    .relationship-content input:not([type="checkbox"]):not([type="hidden"]), .relationship-content select, .relationship-content textarea { max-width: 100%; box-sizing: border-box; }
+    .relationship-content input[type="checkbox"] { width: 1.1rem; height: 1.1rem; padding: 0; vertical-align: middle; }
+    .relationship-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+<div class="relationship-content">
+<p><a href="{% url 'projects:detail' project.pk %}">{{ project.name }}</a> / <a href="{% url 'characters:detail' project.pk character.pk %}">{{ character.name }}</a></p>
+{% block relationship_content %}{% endblock %}
+</div>
+{% endblock %}

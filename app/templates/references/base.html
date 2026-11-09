@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<style>
+    .references { overflow-wrap: anywhere; }
+    .references h1 { font-size: 1.75rem; }
+    .references h2 { font-size: 1.25rem; }
+    .references .ref-text { white-space: pre-wrap; }
+    .references .ref-filters { display: grid; grid-template-columns: minmax(0, 1fr) 12rem auto; gap: 1rem; align-items: end; margin: 1.5rem 0; }
+    .references .ref-filters p { margin: 0; }
+    .references .ref-row { padding: 1rem 0; border-bottom: 1px solid #cbd3ce; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; }
+    .references .ref-row h2 { margin: 0; font-size: 1.1rem; }
+    .references input, .references select, .references textarea { min-width: 0; max-width: 100%; }
+    .references input[type=checkbox] { width: 1rem; height: 1rem; }
+    .references .button { max-width: 100%; white-space: normal; }
+    .references .ref-meta { color: #4b5750; font-size: .875rem; }
+    @media (max-width: 640px) { .references .ref-filters, .references .ref-row { grid-template-columns: minmax(0, 1fr); } }
+</style>
+<section class="references">
+<p><a href="{% url 'projects:detail' project.pk %}">{{ project.name }}</a></p>
+{% block references_content %}{% endblock %}
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% load i18n %}
+{% if memberships %}
+<style>
+    .membership-table { min-width: 44rem; table-layout: fixed; }
+    .membership-table th, .membership-table td { overflow-wrap: anywhere; font-size: .9rem; }
+    .membership-table .actions { align-items: flex-start; gap: .4rem; }
+</style>
+<div class="table-wrap">
+    <table class="membership-table">
+        <colgroup><col style="width:22%"><col style="width:15%"><col style="width:13%"><col style="width:27%"><col style="width:23%"></colgroup>
+        <thead><tr>
+            <th>{% if return_to == "character" %}{% trans "Organización" %}{% else %}{% trans "Personaje" %}{% endif %}</th>
+            <th>{% trans "Cargo" %}</th><th>{% trans "Estado" %}</th><th>{% trans "Periodo narrativo" %}</th><th>{% trans "Acciones" %}</th>
+        </tr></thead>
+        <tbody>{% for membership in memberships %}<tr>
+            <td>
+                {% if return_to == "character" %}<a href="{% url 'organizations:detail' project.pk membership.organization_id %}">{{ membership.organization.name }}</a>
+                {% else %}<a href="{% url 'characters:detail' project.pk membership.character_id %}">{{ membership.character.name }}</a>{% endif %}
+                {% if membership.description %}<details><summary>{% trans "Descripción" %}</summary><div>{{ membership.description|linebreaksbr }}</div></details>{% endif %}
+            </td>
+            <td>{{ membership.position_title|default:"-" }}</td><td>{{ membership.get_membership_status_display }}</td>
+            <td>{% if membership.joined_at_text or membership.left_at_text %}
+                {% if membership.joined_at_text %}<div><strong>{% trans "Ingreso" %}:</strong> {{ membership.joined_at_text }}</div>{% endif %}
+                {% if membership.left_at_text %}<div><strong>{% trans "Salida" %}:</strong> {{ membership.left_at_text }}</div>{% endif %}
+                {% else %}-{% endif %}</td>
+            <td>{% if access.edit %}<div class="actions">
+                <a href="{% url 'organizations:membership_edit' project.pk membership.pk %}?return_to={{ return_to }}">{% trans "Editar afiliación" %}</a>
+                <a href="{% url 'organizations:membership_delete' project.pk membership.pk %}?return_to={{ return_to }}">{% trans "Eliminar afiliación" %}</a>
+            </div>{% else %}-{% endif %}</td>
+        </tr>{% endfor %}</tbody>
+    </table>
+</div>
+{% if memberships.has_other_pages %}<div class="actions">
+    {% if memberships.has_previous %}<a href="{% querystring memberships_page=memberships.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
+    <span>{% blocktrans with current=memberships.number total=memberships.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</span>
+    {% if memberships.has_next %}<a href="{% querystring memberships_page=memberships.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
+</div>{% endif %}
+{% else %}<p>{% trans "Sin afiliaciones registradas." %}</p>{% endif %}

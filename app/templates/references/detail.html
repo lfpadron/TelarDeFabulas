@@ -1,0 +1,25 @@
+{% extends "references/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{{ reference.title }} | {{ project.name }}{% endblock %}
+{% block references_content %}
+{% project_permissions project as access %}
+<p>{{ reference.get_material_type_display }}</p><h1>{{ reference.title }}</h1>
+{% if reference.short_description %}<div class="ref-text">{{ reference.short_description }}</div>{% endif %}
+{% if reference.author %}<p><strong>{% trans "Autor" %}:</strong> {{ reference.author }}</p>{% endif %}
+{% if reference.publication_year_text %}<p><strong>{% trans "Año de publicación" %}:</strong> {{ reference.publication_year_text }}</p>{% endif %}
+{% if reference.publisher %}<p><strong>{% trans "Editorial" %}:</strong> {{ reference.publisher }}</p>{% endif %}
+{% if external_url %}<p><a href="{{ external_url }}" target="_blank" rel="noopener noreferrer">{% trans "Enlace externo" %}</a></p>{% endif %}
+{% if reference.notes %}<h2>{% trans "Notas" %}</h2><div class="ref-text">{{ reference.notes }}</div>{% endif %}
+{% if reference.file %}<h2>{% trans "Archivo privado" %}</h2><p>{{ reference.original_filename }} · {{ reference.file_size|filesizeformat }}</p><p><a class="button" href="{% url 'references:download' project.pk reference.pk %}">{% trans "Descargar archivo" %}</a></p>{% endif %}
+<p class="ref-meta">{% trans "Creado" %}: {{ reference.created_at|date:"SHORT_DATETIME_FORMAT" }}<br>{% trans "Actualizada" %}: {{ reference.updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+<div class="actions">
+<a class="button secondary" href="{% url 'references:list' project.pk %}">{% trans "Volver a referencias" %}</a>
+{% if access.edit %}<a class="button" href="{% url 'references:edit' project.pk reference.pk %}">{% trans "Editar" %}</a><a class="button warning" href="{% url 'references:delete' project.pk reference.pk %}">{% trans "Eliminar" %}</a>{% endif %}
+</div>
+<h2>{% trans "Entidades asociadas" %}</h2>
+{% if access.edit %}<p><a href="{% url 'references:attach' project.pk reference.pk %}">{% trans "Asociar entidad" %}</a></p>{% endif %}
+{% for association in associations %}<article class="ref-row"><div><a href="{{ association.entity_url }}">{{ association.entity }}</a>{% if association.description %}<p>{{ association.description }}</p>{% endif %}</div>
+{% if access.edit %}<a href="{% url 'references:detach' project.pk association.pk %}">{% trans "Desvincular" %}</a>{% endif %}</article>
+{% empty %}<p>{% trans "Sin asociaciones." %}</p>{% endfor %}
+{% include "references/_pagination.html" with page=associations %}
+{% endblock %}

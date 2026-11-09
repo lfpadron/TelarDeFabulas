@@ -58,6 +58,9 @@ INSTALLED_APPS = [
     "apps.manuscripts.apps.ManuscriptsConfig",
     "apps.characters.apps.CharactersConfig",
     "apps.geography.apps.GeographyConfig",
+    "apps.organizations.apps.OrganizationsConfig",
+    "apps.worldbuilding.apps.WorldbuildingConfig",
+    "apps.references.apps.ReferencesConfig",
     "apps.notes.apps.NotesConfig",
     "apps.exports.apps.ExportsConfig",
     "apps.styles.apps.StylesConfig",
@@ -128,6 +131,9 @@ STORAGES = {
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 CHARACTER_IMAGE_MAX_MB = max(1, env_int("CHARACTER_IMAGE_MAX_MB", 5))
+REFERENCE_IMAGE_MAX_MB = bounded_env_int("REFERENCE_IMAGE_MAX_MB", 10, 100)
+REFERENCE_DOCUMENT_MAX_MB = bounded_env_int("REFERENCE_DOCUMENT_MAX_MB", 20, 100)
+REFERENCE_PROJECT_STORAGE_MAX_MB = bounded_env_int("REFERENCE_PROJECT_STORAGE_MAX_MB", 500, 1048576)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
@@ -140,6 +146,7 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
+    "reference-file-cleanup": {"task": "apps.references.cleanup_files", "schedule": 60.0},
     "recover-exports": {"task": "apps.exports.recover_exports", "schedule": 60.0},
     "export-notifications": {"task": "apps.exports.send_pending_notifications", "schedule": 60.0},
     "expire-exports": {"task": "apps.exports.cleanup_expired_exports", "schedule": 86400.0},

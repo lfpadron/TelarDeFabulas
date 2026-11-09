@@ -1,0 +1,35 @@
+{% extends "organizations/base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{% trans "Organizaciones" %} | {{ project.name }}{% endblock %}
+{% block organizations_content %}
+{% project_permissions project as access %}
+<h1>{% trans "Organizaciones" %}</h1>
+{% if access.edit %}<div class="actions"><a class="button" href="{% url 'organizations:create' project.pk %}">{% trans "Crear organización" %}</a></div>{% endif %}
+{% if events %}
+<ul class="geo-tree">
+{% for event in events %}
+    {% if event.kind == "open" %}
+        {% with organization=event.organization %}
+        <li data-organization-id="{{ organization.pk }}"><details open>
+            <summary><strong>{{ organization.name }}</strong><span class="muted">{{ organization.type_label }}</span></summary>
+            {% if organization.short_description %}<p class="geo-description">{{ organization.short_description }}</p>{% endif %}
+            <div class="geo-actions">
+                <a href="{% url 'organizations:detail' project.pk organization.pk %}">{% trans "Ver" %}</a>
+                {% if access.edit %}
+                    <a href="{% url 'organizations:create' project.pk %}?parent={{ organization.pk }}">{% trans "Crear subordinada" %}</a>
+                    <a href="{% url 'organizations:edit' project.pk organization.pk %}">{% trans "Editar" %}</a>
+                    <a href="{% url 'organizations:move' project.pk organization.pk %}">{% trans "Mover" %}</a>
+                    <a href="{% url 'organizations:delete' project.pk organization.pk %}">{% trans "Eliminar" %}</a>
+                    <span class="geo-order">
+                        {% if event.can_move_up %}<form method="post" action="{% url 'organizations:move_up' project.pk organization.pk %}">{% csrf_token %}<button class="button secondary" title="{% trans 'Subir' %}" aria-label="{% trans 'Subir' %}" type="submit">&#8593;</button></form>{% endif %}
+                        {% if event.can_move_down %}<form method="post" action="{% url 'organizations:move_down' project.pk organization.pk %}">{% csrf_token %}<button class="button secondary" title="{% trans 'Bajar' %}" aria-label="{% trans 'Bajar' %}" type="submit">&#8595;</button></form>{% endif %}
+                    </span>
+                {% endif %}
+            </div>
+            <ul{% if event.indent %} class="indent"{% endif %}>
+        {% endwith %}
+    {% else %}</ul></details></li>{% endif %}
+{% endfor %}
+</ul>
+{% else %}<p>{% trans "Todavía no hay organizaciones en este proyecto." %}</p>{% endif %}
+{% endblock %}

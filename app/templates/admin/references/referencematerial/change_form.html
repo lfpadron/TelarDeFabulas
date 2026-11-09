@@ -1,0 +1,5 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+{% block form_top %}{{ block.super }}
+{% if adminform.form.revision_conflict %}<p class="errornote">{% trans "Tus textos no se guardaron y siguen en este formulario. El archivo anterior permanece intacto." %}</p><p><a href="{% url 'admin:references_referencematerial_change' original.pk %}" target="_blank" rel="noopener">{% trans "Abrir revisión actual en otra pestaña" %}</a></p>{% endif %}
+{% endblock %}

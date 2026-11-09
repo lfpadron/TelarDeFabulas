@@ -1,11 +1,16 @@
 from django.urls import path
 
-from . import views
+from . import relationship_views, views
 
 
 app_name = "characters"
 
 urlpatterns = [
+    path("projects/<int:project_pk>/characters/<int:character_pk>/relationships/", relationship_views.relationship_list, name="relationship_list"),
+    path("projects/<int:project_pk>/characters/<int:character_pk>/relationships/create/", relationship_views.create, name="relationship_create"),
+    path("projects/<int:project_pk>/relationships/<int:relationship_pk>/", relationship_views.detail, name="relationship_detail"),
+    path("projects/<int:project_pk>/relationships/<int:relationship_pk>/edit/", relationship_views.edit, name="relationship_edit"),
+    path("projects/<int:project_pk>/relationships/<int:relationship_pk>/delete/", relationship_views.delete, name="relationship_delete"),
     path("projects/<int:project_pk>/characters/", views.character_list, name="list"),
     path("projects/<int:project_pk>/characters/create/", views.character_create, name="create"),
     path("projects/<int:project_pk>/characters/<int:character_pk>/", views.character_detail, name="detail"),

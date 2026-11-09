@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,12 +11,14 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_safe
 
 from apps.manuscripts.models import ManuscriptNode
+from apps.organizations.selectors import project_memberships
 from apps.core.decorators import project_access
 from apps.core.files import open_private_file, private_file_response
 from apps.core.permissions import Action, can_edit_project, local_project_relations
 
 from .forms import CharacterForm, CharacterMentionForm
 from .models import Character, CharacterMention
+from .relationship_selectors import relationship_groups
 from .validators import IMAGE_CONTENT_TYPES, verified_image_format
 
 
@@ -136,6 +139,8 @@ def character_detail(request, project_pk, character_pk):
             "character_mentions": character_mentions,
             "can_manage_mentions": can_edit_project(request.user, project),
             "linked_notes": linked_notes,
+            "relationship_groups": relationship_groups(character, request.GET),
+            "memberships": Paginator(project_memberships(project).filter(character=character), 50).get_page(request.GET.get("memberships_page")),
         },
     )
 

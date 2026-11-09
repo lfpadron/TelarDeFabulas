@@ -1,0 +1,10 @@
+{% extends "organizations/base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Eliminar organización" %} | {{ project.name }}{% endblock %}
+{% block organizations_content %}
+<h1>{% trans "Eliminar organización" %}</h1>
+<p>{% blocktrans with name=organization.name %}¿Eliminar «{{ name }}»? Esta acción no se puede deshacer.{% endblocktrans %}</p>
+{% if blockers %}<ul class="errorlist">{% for reason in blockers %}<li>{{ reason }}</li>{% endfor %}</ul>
+{% else %}<form method="post">{% csrf_token %}<button class="button warning" type="submit">{% trans "Confirmar eliminación" %}</button></form>{% endif %}
+<p><a href="{% url 'organizations:detail' project.pk organization.pk %}">{% trans "Cancelar" %}</a></p>
+{% endblock %}

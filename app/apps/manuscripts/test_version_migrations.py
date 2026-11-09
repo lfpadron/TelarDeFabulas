@@ -14,7 +14,7 @@ class SceneVersionMigrationTests(TransactionTestCase):
     def setUp(self):
         self.assertTrue(connection.settings_dict["NAME"].startswith("test_"))
         self.latest = MigrationExecutor(connection).loader.graph.leaf_nodes()
-        self.other_targets = [target for target in self.latest if target[0] not in ("manuscripts", "exports")] + [
+        self.other_targets = [target for target in self.latest if target[0] not in ("manuscripts", "exports", "references")] + [
             ("exports", "0002_exportjob_enqueued_at_exportjob_export_mode_and_more")]
         old = [*self.other_targets, ("manuscripts", "0002_literary_hierarchy")]
         self.addCleanup(lambda: MigrationExecutor(connection).migrate(self.latest))

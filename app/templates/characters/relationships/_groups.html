@@ -1,0 +1,39 @@
+{% load i18n project_permissions %}
+{% project_permissions project as access %}
+<style>
+    .relationship-section { margin-top: 2rem; overflow-wrap: anywhere; }
+    .relationship-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #cbd3ce; padding: 1rem 0; }
+    .relationship-row > div { min-width: 0; }
+    .relationship-row p { margin: 0 0 .5rem; }
+    .relationship-row .actions { flex-shrink: 0; }
+    @media (max-width: 640px) { .relationship-row { display: block; } }
+</style>
+<section class="relationship-section" aria-labelledby="relationships-heading">
+<h2 id="relationships-heading">{% trans "Relaciones" %}</h2>
+<div class="actions">
+{% if access.edit %}<a class="button" href="{% url 'characters:relationship_create' project.pk character.pk %}">{% trans "Agregar relación" %}</a>{% endif %}
+{% if embedded %}<a href="{% url 'characters:relationship_list' project.pk character.pk %}">{% trans "Ver todas las relaciones" %}</a>{% endif %}
+</div>
+{% for group in relationship_groups %}
+<h3>{{ group.title }}</h3>
+{% for relationship in group.page %}
+<article class="relationship-row">
+    <div><p>{% include "characters/relationships/_direction.html" %}</p><strong>{{ relationship.type_label }}</strong></div>
+    <div class="actions">
+        <a href="{% url 'characters:relationship_detail' project.pk relationship.pk %}?character={{ character.pk }}">{% trans "Ver relación" %}</a>
+        {% if access.edit %}
+        <a href="{% url 'characters:relationship_edit' project.pk relationship.pk %}?character={{ character.pk }}">{% trans "Editar relación" %}</a>
+        <a href="{% url 'characters:relationship_delete' project.pk relationship.pk %}?character={{ character.pk }}">{% trans "Eliminar relación" %}</a>
+        {% endif %}
+    </div>
+</article>
+{% empty %}<p>{% trans "Sin relaciones en este grupo." %}</p>{% endfor %}
+{% if group.page.has_other_pages %}
+<nav aria-label="{{ group.title }}"><div class="actions">
+{% if group.page.has_previous %}<a href="{% if group.page_key == 'outgoing_page' %}{% querystring outgoing_page=group.page.previous_page_number %}{% elif group.page_key == 'incoming_page' %}{% querystring incoming_page=group.page.previous_page_number %}{% else %}{% querystring mutual_page=group.page.previous_page_number %}{% endif %}#relationships-heading">{% trans "Anterior" %}</a>{% endif %}
+<span>{% blocktrans with number=group.page.number total=group.page.paginator.num_pages %}Página {{ number }} de {{ total }}{% endblocktrans %}</span>
+{% if group.page.has_next %}<a href="{% if group.page_key == 'outgoing_page' %}{% querystring outgoing_page=group.page.next_page_number %}{% elif group.page_key == 'incoming_page' %}{% querystring incoming_page=group.page.next_page_number %}{% else %}{% querystring mutual_page=group.page.next_page_number %}{% endif %}#relationships-heading">{% trans "Siguiente" %}</a>{% endif %}
+</div></nav>
+{% endif %}
+{% endfor %}
+</section>

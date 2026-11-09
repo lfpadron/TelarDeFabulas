@@ -1,0 +1,10 @@
+{% extends "references/base.html" %}
+{% load i18n %}
+{% block title %}{{ title }} | {{ project.name }}{% endblock %}
+{% block references_content %}
+<h1>{{ title }}</h1>{% if entity %}<p>{{ entity }}</p>{% endif %}
+{% if conflict %}<div class="warning-note" role="alert"><p>{% trans "Tus textos siguen en el formulario. El archivo enviado no se guardó; vuelve a seleccionarlo al conciliar los cambios." %}</p><a href="{% url 'references:edit' project.pk reference.pk %}" target="_blank" rel="noopener">{% trans "Abrir revisión actual en otra pestaña" %}</a></div>{% endif %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}
+<div class="actions"><button class="button" type="submit">{% trans "Guardar" %}</button>
+{% if reference %}<a href="{% url 'references:detail' project.pk reference.pk %}">{% trans "Cancelar" %}</a>{% else %}<a href="{% url 'references:list' project.pk %}">{% trans "Cancelar" %}</a>{% endif %}</div></form>
+{% endblock %}

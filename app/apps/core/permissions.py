@@ -97,7 +97,7 @@ def local_project_relations(queryset, project_path="project"):
                 Q(style_template__is_system=True)
                 | Q(style_template__user=F(f"{project_path}__user"))
             )
-        if field.name not in {"parent", "node", "root_node", "character", "residence"}:
+        if field.name not in {"parent", "node", "root_node", "character", "residence", "headquarters", "organization"}:
             continue
         queryset = queryset.filter(
             Q(**{f"{field.name}__isnull": True}) | Q(**{f"{field.name}__project": F(project_path)})

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models.functions import Greatest, Least
 from django.utils.translation import gettext_lazy as _
 
 from apps.manuscripts.models import ManuscriptNode
@@ -160,6 +161,13 @@ class Character(models.Model):
             self.full_clean()
             return super().save(*args, **kwargs)
 
+    def delete(self, using=None, keep_parents=False):
+        using = using or self._state.db or "default"
+        with transaction.atomic(using=using):
+            project = Project.objects.using(using).select_for_update().get(pk=self.project_id)
+            validate_project_action(project)
+            return super().delete(using=using, keep_parents=keep_parents)
+
 
 class CharacterDramaticRole(models.Model):
     class DramaticRole(models.TextChoices):
@@ -262,3 +270,103 @@ class CharacterMention(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class CharacterRelationship(models.Model):
+    class RelationshipType(models.TextChoices):
+        FRIEND = "FRIEND", _("Amistad")
+        ENEMY = "ENEMY", _("Enemistad")
+        RIVAL = "RIVAL", _("Rivalidad")
+        FAMILY = "FAMILY", _("Familia")
+        PARENT = "PARENT", _("Progenitor")
+        CHILD = "CHILD", _("Hijo/a")
+        SIBLING = "SIBLING", _("Hermano/a")
+        ROMANTIC_INTEREST = "ROMANTIC_INTEREST", _("Interés romántico")
+        PARTNER = "PARTNER", _("Pareja")
+        MENTOR = "MENTOR", _("Mentor/a")
+        STUDENT = "STUDENT", _("Discípulo/a")
+        ALLY = "ALLY", _("Alianza")
+        TRUST = "TRUST", _("Confianza")
+        DISTRUST = "DISTRUST", _("Desconfianza")
+        OTHER = "OTHER", _("Otro")
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="character_relationships", verbose_name=_("Proyecto"))
+    source_character = models.ForeignKey(Character, on_delete=models.CASCADE, related_name="outgoing_relationships", verbose_name=_("Personaje origen"))
+    target_character = models.ForeignKey(Character, on_delete=models.CASCADE, related_name="incoming_relationships", verbose_name=_("Personaje destino"))
+    relationship_type = models.CharField(_("Tipo de relación"), max_length=20, choices=RelationshipType.choices, default=RelationshipType.FRIEND)
+    custom_relationship_type = models.CharField(_("Tipo personalizado"), max_length=180, blank=True)
+    description = models.TextField(_("Descripción"), blank=True)
+    is_reciprocal = models.BooleanField(_("Relación recíproca"), default=False)
+    created_at = models.DateTimeField(_("Creada"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("Actualizada"), auto_now=True)
+
+    class Meta:
+        ordering = ["source_character__name", "target_character__name", "relationship_type", "pk"]
+        verbose_name = _("relación entre personajes")
+        verbose_name_plural = _("relaciones entre personajes")
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(source_character=models.F("target_character")), name="char_rel_distinct_endpoints"),
+            models.CheckConstraint(condition=models.Q(relationship_type__in=[
+                "FRIEND", "ENEMY", "RIVAL", "FAMILY", "PARENT", "CHILD", "SIBLING", "ROMANTIC_INTEREST", "PARTNER",
+                "MENTOR", "STUDENT", "ALLY", "TRUST", "DISTRUST", "OTHER"],), name="char_rel_type_valid"),
+            models.CheckConstraint(condition=models.Q(is_reciprocal=False) | ~models.Q(relationship_type__in=["PARENT", "CHILD", "MENTOR", "STUDENT"]),
+                                   name="char_rel_directional_only"),
+            models.CheckConstraint(condition=(models.Q(relationship_type="OTHER", custom_relationship_type__regex=r"\S") |
+                (~models.Q(relationship_type="OTHER") & models.Q(custom_relationship_type=""))), name="char_rel_custom_type_valid"),
+            models.UniqueConstraint(fields=["source_character", "target_character", "relationship_type"], name="char_rel_exact_unique",
+                violation_error_message=_("Ya existe una relación con ese origen, destino y tipo.")),
+            models.UniqueConstraint(Least("source_character", "target_character"), Greatest("source_character", "target_character"), "relationship_type",
+                condition=models.Q(is_reciprocal=True), name="char_rel_mutual_pair_unique",
+                violation_error_message=_("Ya existe una relación recíproca de ese tipo entre estos personajes.")),
+        ]
+
+    def __str__(self):
+        return _("%(source)s %(direction)s %(target)s: %(type)s") % {
+            "source": self.source_character, "direction": "<->" if self.is_reciprocal else "->",
+            "target": self.target_character, "type": self.type_label,
+        }
+
+    @property
+    def type_label(self):
+        return self.custom_relationship_type if self.relationship_type == self.RelationshipType.OTHER else self.get_relationship_type_display()
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        self.custom_relationship_type = (self.custom_relationship_type or "").strip() if self.relationship_type == self.RelationshipType.OTHER else ""
+        if self.relationship_type == self.RelationshipType.OTHER and not self.custom_relationship_type:
+            errors["custom_relationship_type"] = _("Escribe el tipo de relación personalizado.")
+        if self.is_reciprocal and self.relationship_type in ("PARENT", "CHILD", "MENTOR", "STUDENT"):
+            errors["is_reciprocal"] = _("Progenitor, hijo/a, mentor/a y discípulo/a son relaciones direccionales.")
+        if self.source_character_id and self.source_character_id == self.target_character_id:
+            errors["target_character"] = _("El origen y el destino deben ser personajes distintos.")
+        if self.project_id:
+            project = Project.objects.using(self._state.db).filter(pk=self.project_id).first()
+            if project is None:
+                errors["project"] = _("Selecciona un proyecto existente.")
+            else:
+                validate_project_action(project)
+            if self.pk and type(self).objects.using(self._state.db).filter(pk=self.pk).exclude(project_id=self.project_id).exists():
+                raise ValidationError(_("No se permite trasladar relaciones a otro proyecto."))
+            for key in ("source_character", "target_character"):
+                pk = getattr(self, f"{key}_id")
+                if pk and not Character.objects.using(self._state.db).filter(pk=pk, project_id=self.project_id).exists():
+                    errors[key] = _("Ambos personajes deben pertenecer al proyecto de la relación.")
+        if errors:
+            raise ValidationError(errors)
+        if self.source_character_id and self.target_character_id and self.relationship_type:
+            inverse = type(self).objects.using(self._state.db).filter(
+                source_character_id=self.target_character_id, target_character_id=self.source_character_id,
+                relationship_type=self.relationship_type).exclude(pk=self.pk)
+            if not self.is_reciprocal:
+                inverse = inverse.filter(is_reciprocal=True)
+            if inverse.exists():
+                raise ValidationError(_("Ya existe una relación inversa de ese tipo y al menos una es recíproca. Edita o elimina el vínculo existente."))
+
+    def save(self, *args, **kwargs):
+        from .relationship_services import save_relationship
+        return save_relationship(self, *args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        from .relationship_services import delete_relationship
+        return delete_relationship(self, using=using, keep_parents=keep_parents)

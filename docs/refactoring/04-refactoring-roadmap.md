@@ -1,6 +1,6 @@
 # Roadmap de refactorizacion v01
 
-Fecha: 2026-11-08. Actualizado tras Prompt 08 (F6.1). Cada fase posterior requiere
+Fecha: 2026-11-08. Actualizado tras Prompt 12 (F7). Cada fase posterior requiere
 una instruccion independiente de implementacion.
 No se estima duracion sin inventario de datos y presupuesto operativo. El orden
 protege identidad/texto antes de introducir nuevas reglas comerciales.
@@ -16,8 +16,10 @@ protege identidad/texto antes de introducir nuevas reglas comerciales.
 | F4: selector y formatos (implementada) | Documento neutral, WORK/FINAL y snapshot en Prompt 06; Markdown en Prompt 07; HTML/DOCX/PDF/EPUB y preview compatibles | F3; D06/D15 | Misma seleccion, identidad y orden; texto legacy conservado en WORK | Snapshot inmutable, render y descargas; validaciones 11 y 12 |
 | F5: lifecycle de exports (implementada) | REQUESTED/READY/DELETED, claim atomico, heartbeat/lease, recuperacion, retencion, limpieza manual/Beat y outbox | F4; D14-D15; storage privado F1 | Token descarta worker antiguo; cleanup espera descargas y no toca fuente; SMTP best-effort sin adjunto | PostgreSQL concurrente, Celery real, broker/disco/SMTP fallando, worker vs cleanup/download y temporales; validacion 12 |
 | F6.1: geografia (implementada) | Ubicaciones con jerarquia flexible, orden unico, movimientos y residencia principal opcional | F1-F2; D08 resuelta para padre principal flexible por Prompt 08 | ID/texto/habitantes conservados, sin ciclos, borrado solo de hojas sin referencias | 84 nuevas: modelo/UI/seguridad, nueve carreras PostgreSQL y migracion aditiva; suite 624 y QA HTTP/visual; detalle en 13 |
-| F6.2+: mundo y referencias | Organizations/Worldbuilding/References, relaciones tipadas, limites y descarga privada | F6.1; D07 | Varios bloques por categoria, adjuntos privados y limites medidos | Aislamiento por proyecto, MIME/tamano/cuota, FK de referencias y limpieza de copia |
-| F7: relaciones de personajes | Afiliaciones, lugares, amistad/interes romantico y varias imagenes por referencia | F6; D09 | Fichas/roles/imagenes anteriores conservados; relaciones no duplican conceptos existentes | Simetria/direccion, propietario, duplicados, copias de imagen con hash y porcentaje de ficha |
+| F6.2: organizaciones (implementada) | Jerarquia opcional, nueve tipos, sede principal y afiliaciones con cargo/estado/periodo textual | F6.1; alcance aprobado en Prompt 09 | ID/texto/afiliaciones conservados, sin ciclos ni referencias cruzadas; borrados bloqueados por relaciones | 97 nuevas: 89 funcionales, siete carreras PostgreSQL y una migracion; evidencia y suite integrada en 14 |
+| F6.3: mundo (implementada) | Entradas planas de politica/religion/historia, orden por categoria y revision optimista | F6.1-F6.2; alcance aprobado en Prompt 10 | ID/texto conservados; revision obsoleta devuelve 409 y conserva formulario; admin protegido | 88 nuevas: 79 funcionales, ocho carreras PostgreSQL y una migracion; evidencia y suite integrada en 15 |
+| F6.4: referencias (implementada) | Cinco tipos, adjuntos privados, asociaciones explicitas y limpieza durable | F6.1-F6.3; alcance aprobado en Prompt 11 | Un archivo reutilizado, cuota serializada, reemplazo tras commit y aislamiento por propietario/proyecto | 102 nuevas: archivos, SQL, permisos, UI/admin, diez carreras y migracion; suite integrada y evidencia en 16 |
+| F7: relaciones de personajes (implementada) | Quince tipos interpersonales, direccion explicita, reciprocidad opcional en una fila y CRUD desde ambas fichas | F6; alcance acotado aprobado en Prompt 12 | Sin duplicados exactos/inversos mutuos, sin cruces de proyecto; fichas/roles/menciones/afiliaciones conservados | 94 nuevas: 83 funcionales, diez carreras PostgreSQL, migracion aditiva; QA escritorio/movil y evidencia integrada en 17 |
 | F8: exportar entidades | Reutilizar selector para geografia, organizaciones, entradas, personajes y referencias | F4/F6/F7; D06-D07 | Alcance de seccion/entidad exacto, archivos privados incluidos solo segun seleccion/politica | Matriz entidad/formato, enlaces/adjuntos, aislamiento, orden y grandes volumenes |
 | F9: trial y pago manual | Plan/Subscription/Payment, capacidades calculadas, transicion de cuentas heredadas y cupos configurables | F1/F5; D10-D14/D18-D19 | Trial con un proyecto y todas las funciones; vencido solo lectura/export; pagos manuales auditables | Reloj controlado, cupos concurrentes, cambio de plan y permisos en todas las apps |
 | F10: Stripe y retencion de cuenta | PaymentEvent, webhooks idempotentes, avisos por periodo, conservacion anual y purga auditable | F9; D11-D14/D17 | Pago confirmado mantiene acceso; no doble credito; renovacion cancela purga; avisos sin solapamiento | Firma, repeticion/orden de eventos, pago vs purga, ano bisiesto y ensayo de eliminacion en copia |
@@ -93,21 +95,29 @@ podman --connection telar-fabulas-dev compose ps
 podman --connection telar-fabulas-dev compose exec web python manage.py check
 podman --connection telar-fabulas-dev compose exec web python manage.py showmigrations
 podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
-podman --connection telar-fabulas-dev compose exec web python manage.py test
+podman --connection telar-fabulas-dev compose exec web python manage.py test --keepdb --noinput
 podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
 ```
 
 La suite Django usa una base de pruebas separada; confirmar nombre/alias antes
-de ejecutarla en un entorno nuevo. Si existe una base de pruebas anterior, no
-aceptar su destruccion a ciegas. Estos comandos no autorizan migrar la base de
-negocio ni limpiar volumenes.
+de ejecutarla en un entorno nuevo. Desde Prompt 10 se conserva con --keepdb,
+sin borrar bases de datos. Estos comandos no autorizan migrar la base de negocio
+ni limpiar volumenes. No aceptar la destruccion de una base previa a ciegas.
 
 ## Recomendacion para el siguiente prompt
 
-Continuar con **F6.2: organizaciones**, mediante un alcance acotado y permisos
-por proyecto. F6.1 esta implementada: geografia flexible y residencia principal;
-sin mapas, coordenadas, relaciones multiples ni nuevas exportaciones.
-Resultados en [13-geography-validation.md](13-geography-validation.md).
+Continuar con **F8: exportacion de entidades**, aprobando primero una matriz
+acotada de entidades/formatos, seleccion y tratamiento de adjuntos privados.
+Reutilizar selector y snapshots; no exportar relaciones por implicacion.
+F6.1-F6.4 y F7 estan implementadas: geografia, residencia principal, organizaciones,
+sede principal, afiliaciones, entradas de mundo, referencias privadas y relaciones
+interpersonales. El alcance aprobado de F7 no agrega lugares secundarios,
+imagenes, grafos, cronologias ni relaciones entre organizaciones.
+Resultados en [13-geography-validation.md](13-geography-validation.md) y
+[14-organizations-validation.md](14-organizations-validation.md) y
+[15-worldbuilding-validation.md](15-worldbuilding-validation.md) y
+[16-references-validation.md](16-references-validation.md) y
+[17-character-relationships-validation.md](17-character-relationships-validation.md).
 F4/F5 estan implementadas: cinco estados, leases renovables,
 reintentos limitados, auditoria, notificacion opcional y borrado/caducidad seguros.
 Markdown, DOCX y PDF son visibles; HTML/EPUB y preview permanecen compatibles.
@@ -142,3 +152,80 @@ Ciudad A movida desde el navegador a Provincia B, con ID, textos y residentes
 intactos. Permisos y estados verificados; QA retirado y hashes originales iguales.
 Respaldo DB/media previo, restauracion aislada comprobada y retirada de la copia.
 Proxima entrega no debe introducir cobros ni purgas de fuentes.
+
+## Cierre F6.2
+
+Prompt 09 agrega organizations.0001_initial sin cambiar tablas ni datos previos.
+Se comparte solo el algoritmo de orden y recorrido con geografia; los escritores
+conservan sus bloqueos, permisos y validaciones propios. Manuscritos no cambia.
+La regla inicial de pareja unica propuesta en el documento 02 queda reemplazada
+por el alcance aprobado: varios cargos y periodos por personaje/organizacion,
+con unicidad exacta que incluye cargo, estado, ingreso y salida narrativos.
+
+Prueba real con Consejo de Luz, Guardia de Cristal, Academia, Rosariel y Fernaud:
+creacion HTTP; movimiento y cambio de cargo/estado desde navegador integrado;
+sedes bidireccionales, permisos y bloqueos verificados. Datos temporales retirados,
+respaldo restaurado en base aislada y huellas originales identicas.
+Suite integrada: 721 pruebas aprobadas, 97 nuevas; check limpio, sin migraciones
+pendientes y Celery pong. Inventario y limites en el documento 14.
+
+## Cierre F6.3
+
+Prompt 10 agrega worldbuilding.0001_initial, sin alterar tablas ni datos previos.
+Un solo modelo plano, tres categorias, contenido de texto libre, busqueda y
+paginacion. Orden unico por proyecto/categoria desde cero; no se reutiliza una
+abstraccion de arboles. Project se bloquea antes de la fila y se revalida el estado.
+Revision original obligatoria para editar, reclasificar, mover y borrar; HTTP 409
+conserva los campos enviados. Admin mantiene el bloqueo entre validacion y guardado.
+
+QA real: cinco entradas creadas por HTTP, movimiento y reclasificacion con ID/texto
+intactos, conflicto en dos pestanas y dos sesiones HTTP, permisos por estado,
+borrado individual y edicion movil. Datos QA retirados; huellas originales iguales.
+Respaldo DB/media previo conservado, sin ensayo nuevo de restauracion en esta fase.
+No se borro ninguna base ni volumen; incluso la base de pruebas queda conservada.
+Suite integrada: 809 pruebas aprobadas, 88 nuevas; resultados en el documento 15. Check limpio,
+sin migraciones pendientes, Celery pong y cinco servicios Podman rootless activos.
+Papelera, historial completo y politica de adjuntos siguen fuera de este alcance.
+
+## Cierre F6.4
+
+Prompt 11 agrega references.0001_initial sin modificar tablas ni datos previos.
+ReferenceMaterial, ReferenceAssociation y una cola tecnica de limpieza durable.
+Cinco FK tipadas con CHECK exactamente una y unicidad por referencia/destino.
+Cuota tecnica serializada por Project, MIME/tamano verificados, archivos UUID
+privados y descargas como adjuntos. Un reemplazo confirma DB antes de limpiar
+el archivo anterior; fallo fisico reintentable por Beat. Revision optimista para
+textos/reemplazos, tambien en admin, y Character.delete comparte el bloqueo de
+proyecto para evitar carreras al crear vinculos.
+
+Suite integrada: 911 pruebas aprobadas (102 nuevas). QA real en navegador a
+1280x900 y 390x844: Mapa del Reino con tres vinculos y un archivo, descarga exacta,
+reemplazo movil, acceso ajeno denegado, desvinculacion y borrado independientes.
+Solo se retiraron datos QA; hashes de originales iguales antes/despues. Backups
+DB/media conservados; sin ensayo nuevo de restauracion ni borrado de bases o
+volumenes. Cinco servicios rootless activos, check limpio, esquema al dia,
+Celery pong y tarea de limpieza consumida correctamente. Unicamente pypdf como
+dependencia nueva, con lock uv. Detalles y limites en el documento 16.
+
+## Cierre F7
+
+Prompt 12 agrega characters.0004_characterrelationship, sin modificar tablas ni
+datos anteriores. Quince tipos, OTHER personalizado, origen/destino explicitos,
+reciproca en una sola fila y cuatro tipos estrictamente direccionales. No se
+crean inversas semanticas. UNIQUE exacto y funcional parcial para parejas mutuas;
+servicios y admin bloquean Project antes de validar ambas direcciones y escribir.
+
+Relaciones salientes/entrantes/mutuas en las fichas, paginacion 50 por grupo,
+metadatos sin descripciones largas, detalle completo y CRUD con permisos centrales.
+El borrado individual conserva endpoints y otras relaciones; borrar un personaje
+solo elimina sus vinculos. Ultimo guardado completo gana; sin revision optimista,
+historial ni papelera en este modelo. No modifica menciones ni exportaciones.
+
+Suite integrada: **1005 pruebas aprobadas**, 94 nuevas incluidas diez carreras
+PostgreSQL y una migracion aditiva. Check limpio, esquema al dia, Celery pong y
+cinco servicios Podman rootless activos.
+QA real: Rosariel/Fernaud/Arkan, cuatro relaciones, reciprocidad/direccion en
+ambas fichas, duplicado rechazado, edicion movil, permisos y borrado independiente.
+Datos temporales retirados y huellas de originales/media identicas. Respaldo
+previo conservado, sin restauracion nueva ni borrado de bases/volumenes.
+Inventario, resultados integrados y limites en el documento 17.

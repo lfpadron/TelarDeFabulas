@@ -1,0 +1,6 @@
+{% load i18n %}
+{% if page.has_other_pages %}<div class="actions">
+{% if page.has_previous %}<a href="{% querystring page=page.previous_page_number %}">{% trans "Anterior" %}</a>{% endif %}
+<p>{% blocktrans with current=page.number total=page.paginator.num_pages %}Página {{ current }} de {{ total }}{% endblocktrans %}</p>
+{% if page.has_next %}<a href="{% querystring page=page.next_page_number %}">{% trans "Siguiente" %}</a>{% endif %}
+</div>{% endif %}

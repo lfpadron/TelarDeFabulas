@@ -1,0 +1,7 @@
+{% extends "characters/relationships/base.html" %}
+{% load i18n %}
+{% block relationship_content %}
+<h1>{{ character.name }}</h1>
+{% include "characters/relationships/_groups.html" %}
+<p><a class="button secondary" href="{% url 'characters:detail' project.pk character.pk %}">{% trans "Volver a la ficha" %}</a></p>
+{% endblock %}

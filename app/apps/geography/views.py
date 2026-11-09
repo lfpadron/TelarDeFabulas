@@ -44,10 +44,13 @@ def detail(request, project_pk, location_pk):
         messages.error(request, " ".join(exc.messages))
     children = location.children.filter(project=request.project).defer("detailed_description")
     residents = location.residents.filter(project=request.project).only("id", "name", "alias").order_by("name", "pk")
+    organizations = local_project_relations(location.headquartered_organizations.filter(project=request.project)).only(
+        "id", "name", "organization_type", "custom_organization_type").order_by("name", "pk")
     return render(request, "geography/detail.html", {
         "project": request.project, "location": location, "path": path,
         "children": Paginator(children, 50).get_page(request.GET.get("children_page")),
         "residents": Paginator(residents, 50).get_page(request.GET.get("residents_page")),
+        "organizations": Paginator(organizations, 50).get_page(request.GET.get("organizations_page")),
     })
 
 

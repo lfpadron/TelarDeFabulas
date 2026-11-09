@@ -88,6 +88,12 @@
         <p>{% trans "Todavía no hay apariciones o menciones registradas para este personaje." %}</p>
     {% endif %}
 
+    {% include "characters/relationships/_groups.html" with embedded=True %}
+
+    <h2>{% trans "Afiliaciones" %}</h2>
+    {% if access.edit %}<div class="actions"><a class="button" href="{% url 'organizations:membership_create' project.pk %}?character={{ character.pk }}&return_to=character">{% trans "Agregar afiliación" %}</a></div>{% endif %}
+    {% include "organizations/_memberships.html" with return_to="character" %}
+
     <h2>{% trans "Ficha" %}</h2>
     <p><strong>{% trans "Descripción física" %}:</strong><br>{{ character.physical_description|default:"-"|linebreaksbr }}</p>
     <p><strong>{% trans "Descripción psicológica" %}:</strong><br>{{ character.psychological_description|default:"-"|linebreaksbr }}</p>
@@ -143,4 +149,5 @@
         {% endif %}
     </div>
 </section>
+{% load references %}{% reference_section project character %}
 {% endblock %}

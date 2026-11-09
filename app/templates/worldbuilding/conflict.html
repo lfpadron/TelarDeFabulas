@@ -1,0 +1,8 @@
+{% extends "worldbuilding/base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Operación no guardada" %} | {{ project.name }}{% endblock %}
+{% block worldbuilding_content %}
+<h1>{% trans "Operación no guardada" %}</h1>
+{{ form.errors }}
+<p><a href="{% url 'worldbuilding:list' project.pk %}">{% trans "Volver a construcción de mundos" %}</a></p>
+{% endblock %}

@@ -127,3 +127,102 @@ privilegiadas: pueden saltar validaciones del grafo y el rechazo de borrado por
 habitantes. No exponerlas como escritores de negocio; las entradas web/admin
 usan los servicios/modelos protegidos. La restriccion SQL de orden no valida
 proyecto del padre ni ciclos indirectos. No se afirma proteccion contra SQL hostil.
+
+## Actualizacion tras Prompt 09: F6.2
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R03 / R06 / R07 | Mitigados para organizaciones y afiliaciones | Politica central tambien en admin; Project bloqueado antes de escrituras; siete carreras PostgreSQL; UNIQUE de posiciones incluidas raices y UNIQUE de afiliacion con periodo. SQL directo sigue pudiendo crear ciclos o relaciones cruzadas |
+| R04 | Movimiento conserva identidad y estructura concurrente | Edicion de texto no expone padre/posicion; save conserva un movimiento concurrente y rechaza conflictos estructurales. No hay revision optimista en descripciones ni afiliaciones: ultimo guardado completo gana |
+| R12 | Borrado restringido por hijos, miembros y sedes | Organization.parent y Membership.organization PROTECT; servicio bloquea ubicacion usada como sede, SET_NULL como fallback. Borrar afiliacion conserva endpoints; borrar un personaje elimina sus afiliaciones por CASCADE. No se implementa purga de proyectos; debe resolver relaciones explicitamente |
+| R13 | Respaldo local nuevamente ensayado | p09_pre_organizations.dump restaurado en base aislada y comparado por SHA-256; originales identicos tras QA. DB temporal y entidades QA retiradas. Cifrado, copias externas y retencion operacional siguen pendientes |
+| R16 / R17 | Consultas acotadas, carga masiva pendiente | Arbol/ruta iterativos sin N+1 ni descripcion larga; 1100 niveles; integrantes y sedes paginados a 50. Arbol y opciones de formularios materializan el proyecto completo; falta medicion representativa de latencia/DOM |
+| R32 / P2 | Ambiguedad de afiliacion repetida | La identidad duplicada incluye personaje, organizacion, cargo, estado y ambos textos de periodo. Periodos diferentes son validos; los textos no ordenan ni verifican calendarios ficticios. No hay historial automatico de ediciones ni eventos cronologicos |
+| R33 / P2 | Dependencia compartida de arboles | Helpers pequenos de recorrido, orden y preservacion de estructura; 84 pruebas de geografia conservadas y regresion integrada. No hay modelo abstracto nuevo ni cambios de jerarquia literaria |
+
+No se agregan alianzas, sedes secundarias, exportaciones de organizaciones, IA,
+pagos ni tareas de purga. Un backup revertido perderia organizaciones creadas
+despues: preservar las tablas y preferir correccion hacia delante; una reversa
+de organizations.0001 elimina estas tablas y no es un rollback de datos seguro.
+Evidencia, prueba manual e inventario en
+[14-organizations-validation.md](14-organizations-validation.md).
+
+## Actualizacion tras Prompt 10: F6.3
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R04 | Mitigado para WorldbuildingEntry, tambien en admin | Revision esperada y bloqueo Project -> entrada dentro de atomic; HTTP 409 conserva texto enviado. Ocho carreras con conexiones PostgreSQL separadas, incluidas admin/admin y admin/servicio. No implica historial completo ni cierre del riesgo en geografia, organizaciones u otras fichas |
+| R03 / R06 / R07 | Mitigados para las entradas nuevas | Politica central owner/estado, 404 ajeno, sin traslado entre proyectos; UNIQUE(project,category,position), checks locales y orden normalizado. Insercion/movimiento/cambio de categoria/borrado serializados y prueba de rollback |
+| R12 / R34 (nuevo P2) | Borrado individual definitivo, recuperacion pendiente | Confirmacion POST/CSRF/revision; no borra otras entidades. Admin no ofrece borrado; se usa la confirmacion del autor. No hay papelera ni historial: recuperar una entrada requiere respaldo hasta definir politica general |
+| R13 | Respaldo previo e integridad comprobados | p10_pre_worldbuilding.dump, media y hashes originales; igualdad antes/despues de migrate y tras limpiar QA. No se ensaya una restauracion nueva en F6.3. Ninguna base/volumen eliminados; test_telar_fabulas conservada con --keepdb. Backups externos/cifrados y ensayo recurrente pendientes |
+| R16 | Listado acotado; medicion de escala pendiente | 50 filas por categoria, seis consultas como maximo para los tres selectores, content diferido, sin N+1. Movimientos leen metadatos del grupo y actualizan solo filas alteradas, en lotes. Busqueda icontains sin indice de texto dedicado; falta presupuesto de latencia y memoria con proyectos grandes |
+| R35 / P2 | Conflictos conservadores y recuperacion manual | Renumerar tambien incrementa revision de las filas cuya posicion cambia; un formulario puede quedar obsoleto por reordenamiento. Se preservan sus campos y se abre la revision actual aparte; no hay fusion automatica ni autoguardado durable del texto rechazado |
+
+`QuerySet.update`, `bulk_*`, `QuerySet.delete` y SQL directo siguen siendo APIs
+privilegiadas: pueden saltar el control de revision, permisos y normalizacion.
+Los escritores web/admin/model.save usan los servicios protegidos. No hay defensa
+contra SQL hostil ni nuevas tareas de purga. El lock de proyecto serializa tambien
+ediciones en entradas diferentes, una eleccion conservadora que requiere medir
+contencion antes de ampliar la concurrencia a gran escala.
+
+El respaldo pre-migracion no contiene entradas creadas posteriormente. No revertir
+worldbuilding a zero ni restaurar una copia antigua como rollback rutinario;
+preservar el esquema y corregir hacia delante. Sin referencias, adjuntos, cobros,
+IA, cronologia ni exportaciones nuevas. Evidencia e inventario en
+[15-worldbuilding-validation.md](15-worldbuilding-validation.md).
+
+## Actualizacion tras Prompt 11: F6.4
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R03 / R06 / R07 | Mitigados en referencias y asociaciones | Propietario/estado centralizados; cinco FK explicitas, CHECK exactamente una y UNIQUE parciales; proyecto identico validado bajo lock, incluidas entradas admin. SQL directo/bulk pueden saltar pertenencia y permisos; no exponerlos como API |
+| R04 | Reemplazos y texto protegidos por revision | Project -> referencia, revision original requerida, 409 conserva campos; carrera de dos reemplazos y admin/servicio. No hay historial/fusion ni recuperacion del upload rechazado; debe seleccionarse de nuevo |
+| R10 / R30 | Limpieza durable tras commit | UUID nuevo + fsync, commit DB, cola de borrado del anterior con reintento. Fallos de escritura conservan original; fallos fisicos quedan contabilizados. Filesystem y DB no son atomicos: caida o rollback externo puede dejar un UUID huerfano, reconciliable explicitamente tras 24 h; la cuota no incluye huerfanos aun no inventariados |
+| R12 / R34 | Borrado definitivo acotado | Confirmacion POST/CSRF/revision; desvincular o borrar entidad conserva referencia/archivo. Character.delete bloquea Project antes del collector. No hay papelera ni purga general; backups/copias descargadas requieren su propia politica |
+| R13 | Respaldo previo y huellas verificados | Dump PostgreSQL/media conservados, SHA-256 de todas las columnas originales y media iguales antes/despues. No se ensaya nueva restauracion en F6.4; base de pruebas conservada con --keepdb. Continuan pendientes backups externos/cifrados y ensayos recurrentes |
+| R16 / R17 | Listados y cuota acotados; carga real pendiente | Paginacion 50, textos extensos diferidos, sin lectura de archivos ni N+1; cuota serializada frente a subidas concurrentes. Selectores de formularios aun materializan opciones del proyecto; bloqueo incluye validacion/I/O. Medir memoria/latencia/contencion con miles de entidades y uploads grandes |
+| R36 / P2 | Validacion no equivale a antivirus | Pillow, pypdf estricto basico, ZIP/OOXML acotado, UTF-8; sin ejecucion/render/OCR ni fetch externo. Ataques complejos a parsers y contenido peligroso al abrir en clientes externos siguen siendo riesgo. Evaluar aislamiento/limites CPU, escaneo y actualizacion de dependencias antes de aceptar cargas publicas masivas |
+| R37 / P2 | Cuota tecnica y capacidad fisica distintas | 10/20/500 MiB por defecto, cuota de referencias activas + limpieza pendiente. Reemplazo exige espacio para ambas versiones. No cubre otras apps, backups ni espacio libre real del disco; ENOSPC se controla, pero requiere monitorizar capacidad y cola de limpieza |
+
+911 pruebas aprobadas; 102 nuevas con diez carreras PostgreSQL y migracion aditiva.
+QA real valida permisos, tres asociaciones/un archivo, descarga adjunta, reemplazo,
+desvinculacion y borrado sin tocar entidades. Beat programa limpieza cada minuto;
+registros fallidos usan backoff hasta un dia y requieren alerta operacional si
+persisten. --orphans es manual, solo UUID de referencias de mas de 24 h; no es una
+papelera ni recupera archivos. Solo el servicio debe escribir en PRIVATE_MEDIA_ROOT;
+se rechazan symlinks, pero no se promete defensa frente a otro proceso local hostil
+con acceso de escritura al mismo volumen.
+
+No restaurar el dump previo ni revertir references a zero para resolver fallos
+tras crear materiales; conservar esquema/datos y preferir correccion hacia delante.
+No se implementan bibliografia automatica, OCR, IA, exportacion de referencias,
+almacenamiento externo ni planes comerciales. Evidencia e inventario en
+[16-references-validation.md](16-references-validation.md).
+
+## Actualizacion tras Prompt 12: F7
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R03 / R06 / R07 | Mitigados para relaciones interpersonales | Propietario/estado centralizados, extremos del mismo proyecto, sin autorrelaciones; UNIQUE exacto, UNIQUE funcional parcial para mutuas y checks SQL. Project bloqueado en servicios/model.save/admin antes de validar duplicados y escribir. Diez carreras PostgreSQL |
+| R04 | Integridad serializada; texto sin revision optimista | No se crean duplicados por dos POST simultaneos. Un guardado parcial conserva los demas campos actuales; dos formularios completos siguen ultimo guardado gana. No hay aviso 409, historial ni fusion de descripciones en este modelo |
+| R12 / R34 | Borrado definitivo acotado | Confirmacion POST/CSRF, propiedad/estado revalidados; borrar relacion conserva personajes/otros vinculos. Character.delete bloquea Project antes del collector y CASCADE retira solo sus relaciones. Sin papelera ni purga general; restaurar requiere respaldo |
+| R13 | Respaldo previo y huellas conservados | p12_pre_relationships.dump, media y SHA-256 originales iguales tras migrate y QA. No se ensayo restauracion nueva; base de pruebas conservada con --keepdb. Operacion externa/cifrada/recurrente pendiente |
+| R16 / R17 | Paginacion y consultas acotadas | 50 relaciones por grupo, select_related y solo metadatos; selector en una consulta y prueba con 1200 vinculos. Los selectores de formulario cargan todos los personajes; falta medir latencia/DOM y contencion del lock de proyecto bajo carga representativa |
+| R38 / P2 | Semantica de reciprocidad intencionalmente limitada | Una fila mutua; PARENT/CHILD/MENTOR/STUDENT siempre direccionales. Dos unilaterales opuestas del mismo tipo son validas, pero no coexisten con una mutua. Convertirlas exige decidir que descripcion conservar. OTHER sigue siendo un tipo unico por direccion, no uno por etiqueta personalizada |
+
+La constraint funcional protege dos mutuas invertidas. La incompatibilidad entre
+una mutua y una unilateral inversa, asi como la pertenencia cruzada de FK, requiere
+los validadores y el bloqueo cooperante de Project: no se implementaron triggers.
+QuerySet.update/bulk_*/delete y SQL directo siguen siendo entradas privilegiadas,
+no una API de negocio. No hay garantia contra SQL hostil ni inferencia semantica
+de progenitor/hijo, mentor/discipulo o sentimientos mutuos.
+
+1005 pruebas integradas aprobadas; 94 nuevas, con diez carreras PostgreSQL y una
+migracion aditiva. QA real verifica ambas fichas, duplicados, edicion movil,
+permisos por estado y borrado independiente; originales intactos tras retirar QA.
+
+No revertir characters.0004 con relaciones creadas ni restaurar el dump previo
+como rollback rutinario; preservar esquema/datos y corregir hacia delante. No se
+agregan grafos, relaciones entre organizaciones, cronologias, IA, cobros ni
+exportacion de relaciones. Evidencia de pruebas, QA e inventario en
+[17-character-relationships-validation.md](17-character-relationships-validation.md).
