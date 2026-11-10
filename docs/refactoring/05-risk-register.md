@@ -226,3 +226,28 @@ como rollback rutinario; preservar esquema/datos y corregir hacia delante. No se
 agregan grafos, relaciones entre organizaciones, cronologias, IA, cobros ni
 exportacion de relaciones. Evidencia de pruebas, QA e inventario en
 [17-character-relationships-validation.md](17-character-relationships-validation.md).
+
+## Actualizacion tras Prompt 13: F8
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R02 / R03 / R07 | Mitigados para consulta | Politica central, entidad y asociaciones del proyecto, ID ajeno rechazado; archivos sin URL publica, attachment/no-store y 404 para otro usuario. ACTIVE/FROZEN/PENDING exportan; DELETED no |
+| R08 / R11 / R20 | Captura estable | Esquema 2 inmutable con alcance, identidad, jerarquia, textos y estilo. Project y Style bloqueados; once carreras PostgreSQL. Ocho jobs reales conservan contenido despues de editar/mover/borrar; el worker no reconstruye desde entidades vivas |
+| R09 / R10 / R14 | Infraestructura existente reutilizada | Ninguna tarea periodica nueva; leases, token, heartbeat, retry, outbox, retencion y limpieza comunes. Pruebas REFERENCE de estados, recuperacion, opt-in/out, descarga, borrado y caducidad; regresion completa WORK/FINAL/HTML/EPUB/preview |
+| R13 / R28 | Respaldo e integridad comprobados; reversa protegida | Dump/media previos conservados, huellas de campos originales identicas. No se ensayo restauracion nueva. 0004 no modifica manifiestos; bloquea revertir si hay REFERENCE, incluso tombstones. Corregir hacia delante |
+| R16 / R17 | Limites y lotes; falta ensayo de carga | MAX_NODES incluye entidades/contexto/vinculos; MAX_BYTES controla fuentes y manifiesto. Arbol de 1052 ubicaciones sin recursion, consultas constantes al agregar 60 personajes. No es una cuota RSS: renderizadores materializan bytes, selectores web no estan paginados y falta medir latencia/memoria/contencion con contenido real |
+| R18 | Sin lectura de recursos fuente | Whitelist de campos; no FileField ni imagenes; metadatos y nombre original seguro. URLs HTTP(S) privadas/con credenciales reconocibles omitidas, fetcher PDF restringido. No es DLP para secretos que el autor haya escrito en prosa o en una URL opaca |
+
+1093 pruebas integradas aprobadas, 88 nuevas. PDF inspeccionado visualmente y
+DOCX abierto en Word; fuentes/paginacion pueden variar entre equipos. El snapshot
+congela configuracion y texto, no binarios de fuentes ni versiones de librerias;
+su checksum no promete regeneracion byte a byte del PDF/DOCX. Indice DOCX estatico,
+sin paginas calculadas, y Markdown textual; no se modifica esa politica historica.
+Profundidad documental conservada, encabezados renderizados hasta seis niveles.
+
+Los locks siguen siendo cooperantes: usar servicios/model.save y transacciones
+del proyecto en futuros escritores, no SQL/bulk privilegiado como API de negocio.
+Texto duplicado en snapshots consume disco hasta su retencion; sigue pendiente
+medir cuotas por cuenta y operacion externa de respaldos. No hay ZIP, binarios
+incrustados, IA, mapas, grafos, OCR, pagos ni papelera general. Detalle en
+[18-world-exports-validation.md](18-world-exports-validation.md).

@@ -24,8 +24,9 @@ class ExportLifecycleMigrationTests(TransactionTestCase):
             jobs.append((job.pk, job.file.name, status))
         snapshots = list(apps.get_model("exports", "ExportSnapshot").objects.order_by("pk").values())
         before = timezone.now()
-        MigrationExecutor(connection).migrate(latest)
-        apps = MigrationExecutor(connection).loader.project_state(latest).apps
+        lifecycle = [target for target in latest if target[0] != "exports"] + [("exports", "0003_export_lifecycle")]
+        MigrationExecutor(connection).migrate(lifecycle)
+        apps = MigrationExecutor(connection).loader.project_state(lifecycle).apps
         self.assertEqual(snapshots, list(apps.get_model("exports", "ExportSnapshot").objects.order_by("pk").values()))
         for pk, name, status in jobs:
             job = apps.get_model("exports", "ExportJob").objects.get(pk=pk)

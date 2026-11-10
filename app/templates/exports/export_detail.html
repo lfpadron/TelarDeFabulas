@@ -10,10 +10,13 @@
     <p><strong>{% trans "Estado" %}:</strong> {{ export_job.get_status_display }}</p>
     <p><strong>{% trans "Formato" %}:</strong> {{ export_job.get_format_display }}</p>
     <p><strong>{% trans "Modalidad" %}:</strong> {{ export_job.get_export_mode_display }}</p>
+    <p><strong>{% trans "Alcance" %}:</strong> {{ export_job.get_scope_kind_display }}</p>
     <p><strong>{% trans "Proyecto" %}:</strong> {{ export_job.project }}</p>
     <p><strong>{% trans "Selección" %}:</strong> {{ export_job.captured_title|default:export_job.root_node|default:"-" }}</p>
     <p><strong>{% trans "Estilo" %}:</strong> {{ export_job.captured_style|default:export_job.style_template }}</p>
-    {% if export_job.included_scenes != None %}
+    {% if export_job.export_mode == 'REFERENCE' and export_job.included_entities != None %}
+        <p><strong>{% trans "Entidades incluidas" %}:</strong> {{ export_job.included_entities }}</p>
+    {% elif export_job.included_scenes != None %}
         <p><strong>{% trans "Escenas incluidas" %}:</strong> {{ export_job.included_scenes }}</p>
         <p><strong>{% trans "Escenas excluidas" %}:</strong> {{ export_job.excluded_scenes }}</p>
     {% elif export_job.status != "DELETED" %}

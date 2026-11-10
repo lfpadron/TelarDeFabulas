@@ -77,6 +77,36 @@ class NarrativeDocument:
     selection_truncated: bool = False
 
 
+@dataclass(frozen=True)
+class ReferenceSection:
+    id: int
+    title: str
+    depth: int
+    content: str
+    source_kind: str = ""
+    source_id: int | None = None
+    parent_id: int | None = None
+    position: int | None = None
+    node_type = "REFERENCE"
+
+    @property
+    def display_title(self):
+        return self.title
+
+    @property
+    def export_depth(self):
+        return self.depth
+
+    @property
+    def export_content(self):
+        return self.content
+
+
+def capture_style_configuration(style):
+    data = {field.name: getattr(style, field.name) for field in fields(StyleConfiguration)}
+    return {key: str(value) if isinstance(value, Decimal) else value for key, value in data.items()}
+
+
 def manifest_digest(manifest, *, enforce_limit=True):
     digest, size = hashlib.sha256(), 0
     encoder = json.JSONEncoder(ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -159,8 +189,7 @@ def build_manifest(project, style, *, root_node=None, mode="WORK", creator="", m
     metadata = {row["id"]: row for row in source_nodes.values("id", "short_description")}
     legacy = dict(source_nodes.exclude(node_type="SCENE").values_list("id", "content")) if mode == "WORK" else {}
     text = dict(source_versions.values_list("id", "content"))
-    style_data = {field.name: getattr(style, field.name) for field in fields(StyleConfiguration)}
-    style_data = {key: str(value) if isinstance(value, Decimal) else value for key, value in style_data.items()}
+    style_data = capture_style_configuration(style)
     entries = []
     with override(project.locale or "es-mx"):
         for node, depth in ordered:
@@ -188,6 +217,11 @@ def build_manifest(project, style, *, root_node=None, mode="WORK", creator="", m
 
 
 def document_from_manifest(manifest):
+    if manifest.get("schema_version") == 2 and manifest.get("export_mode") == "REFERENCE":
+        return NarrativeDocument(title=manifest["title"], locale=manifest["locale"], creator=manifest["creator"],
+            style=StyleConfiguration(**manifest["style_configuration"]),
+            nodes=tuple(ReferenceSection(**section) for section in manifest["ordered_sections"]),
+            included_scene_count=0, excluded_scene_count=0)
     if manifest.get("schema_version") != 1:
         raise ValidationError(_("La versión del snapshot no es compatible."))
     return NarrativeDocument(
@@ -213,4 +247,7 @@ def get_export_document(job):
             or manifest["user_id"] != job.user_id or manifest["format"] != job.format
             or manifest["style_configuration"]["id"] != job.style_template_id):
         raise ValidationError(_("No se pudo verificar la integridad del snapshot."))
+    if (manifest.get("selection", {}).get("scope_kind", "MANUSCRIPT") != job.scope_kind
+            or (job.export_mode == "REFERENCE") != (manifest.get("schema_version") == 2)):
+        raise ValidationError(_("El alcance no coincide con el snapshot original."))
     return document_from_manifest(manifest)

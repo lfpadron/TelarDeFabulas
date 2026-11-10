@@ -22,6 +22,22 @@ class ExportJob(models.Model):
     class ExportMode(models.TextChoices):
         WORK = "WORK", _("Exportación de trabajo")
         FINAL = "FINAL", _("Exportación definitiva")
+        REFERENCE = "REFERENCE", _("Documento de consulta")
+
+    class ScopeKind(models.TextChoices):
+        MANUSCRIPT = "MANUSCRIPT", _("Manuscrito")
+        CHARACTER = "CHARACTER", _("Ficha de personaje")
+        CHARACTERS_ALL = "CHARACTERS_ALL", _("Todos los personajes")
+        GEOGRAPHIC_LOCATION = "GEOGRAPHIC_LOCATION", _("Ubicación geográfica")
+        GEOGRAPHY_ALL = "GEOGRAPHY_ALL", _("Geografía completa")
+        ORGANIZATION = "ORGANIZATION", _("Organización")
+        ORGANIZATIONS_ALL = "ORGANIZATIONS_ALL", _("Todas las organizaciones")
+        WORLDBUILDING_ENTRY = "WORLDBUILDING_ENTRY", _("Entrada de construcción de mundos")
+        WORLDBUILDING_CATEGORY = "WORLDBUILDING_CATEGORY", _("Categoría de construcción de mundos")
+        WORLDBUILDING_ALL = "WORLDBUILDING_ALL", _("Toda la construcción de mundos")
+        REFERENCE_MATERIAL = "REFERENCE_MATERIAL", _("Material de referencia")
+        REFERENCES_ALL = "REFERENCES_ALL", _("Catálogo de referencias")
+        WORLD_COMPENDIUM = "WORLD_COMPENDIUM", _("Compendio del universo narrativo")
 
     class ExportFormat(models.TextChoices):
         MARKDOWN = "MARKDOWN", _("Markdown")
@@ -77,6 +93,7 @@ class ExportJob(models.Model):
     )
     file = models.FileField(_("archivo"), upload_to=export_upload_path, max_length=255, blank=True)
     export_mode = models.CharField(_("modalidad"), max_length=10, choices=ExportMode.choices, default=ExportMode.WORK)
+    scope_kind = models.CharField(_("alcance"), max_length=32, choices=ScopeKind.choices, default=ScopeKind.MANUSCRIPT)
     request_key = models.UUIDField(_("clave de solicitud"), null=True, blank=True, unique=True, editable=False)
     enqueued_at = models.DateTimeField(_("enviado a la cola"), null=True, blank=True, editable=False)
     error_message = models.TextField(_("mensaje de error"), blank=True)
@@ -112,6 +129,11 @@ class ExportJob(models.Model):
         constraints = [
             models.CheckConstraint(condition=models.Q(status__in=["REQUESTED", "PROCESSING", "FAILED", "READY", "DELETED"]), name="export_valid_status"),
             models.CheckConstraint(condition=models.Q(max_attempts__gte=1, max_attempts__lte=10), name="export_attempt_limit"),
+            models.CheckConstraint(condition=(models.Q(export_mode__in=["WORK", "FINAL"], scope_kind="MANUSCRIPT") |
+                models.Q(export_mode="REFERENCE", root_node__isnull=True, format__in=["MARKDOWN", "DOCX", "PDF"], scope_kind__in=[
+                    "CHARACTER", "CHARACTERS_ALL", "GEOGRAPHIC_LOCATION", "GEOGRAPHY_ALL", "ORGANIZATION", "ORGANIZATIONS_ALL",
+                    "WORLDBUILDING_ENTRY", "WORLDBUILDING_CATEGORY", "WORLDBUILDING_ALL", "REFERENCE_MATERIAL", "REFERENCES_ALL", "WORLD_COMPENDIUM"])),
+                name="export_mode_scope_valid"),
         ]
 
     @property
@@ -134,6 +156,14 @@ class ExportJob(models.Model):
     def clean(self):
         super().clean()
         errors = {}
+
+        if self.export_mode == self.ExportMode.REFERENCE:
+            if self.scope_kind == self.ScopeKind.MANUSCRIPT or self.root_node_id:
+                errors["scope_kind"] = _("Un documento de consulta requiere un alcance del universo narrativo, sin nodo literario.")
+            if self.format not in ("MARKDOWN", "DOCX", "PDF"):
+                errors["format"] = _("Los documentos de consulta admiten Markdown, DOCX o PDF.")
+        elif self.scope_kind != self.ScopeKind.MANUSCRIPT:
+            errors["scope_kind"] = _("Los alcances del universo narrativo requieren la modalidad de consulta.")
 
         if self.project_id and self.user_id and self.project.user_id != self.user_id:
             errors["project"] = _("Solo puedes exportar proyectos propios.")
@@ -161,6 +191,7 @@ class ExportSnapshot(models.Model):
     size_bytes = models.PositiveIntegerField(_("bytes"), editable=False)
     included_scene_count = models.PositiveIntegerField(_("escenas incluidas"), editable=False)
     excluded_scene_count = models.PositiveIntegerField(_("escenas excluidas"), editable=False)
+    included_entity_count = models.PositiveIntegerField(_("entidades incluidas"), default=0, editable=False)
     style_name = models.CharField(_("estilo capturado"), max_length=180, editable=False)
     scope_title = models.CharField(_("título capturado"), max_length=220, editable=False)
 

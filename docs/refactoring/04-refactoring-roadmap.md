@@ -1,6 +1,6 @@
 # Roadmap de refactorizacion v01
 
-Fecha: 2026-11-08. Actualizado tras Prompt 12 (F7). Cada fase posterior requiere
+Fecha: 2026-11-09. Actualizado tras Prompt 13 (F8). Cada fase posterior requiere
 una instruccion independiente de implementacion.
 No se estima duracion sin inventario de datos y presupuesto operativo. El orden
 protege identidad/texto antes de introducir nuevas reglas comerciales.
@@ -20,7 +20,7 @@ protege identidad/texto antes de introducir nuevas reglas comerciales.
 | F6.3: mundo (implementada) | Entradas planas de politica/religion/historia, orden por categoria y revision optimista | F6.1-F6.2; alcance aprobado en Prompt 10 | ID/texto conservados; revision obsoleta devuelve 409 y conserva formulario; admin protegido | 88 nuevas: 79 funcionales, ocho carreras PostgreSQL y una migracion; evidencia y suite integrada en 15 |
 | F6.4: referencias (implementada) | Cinco tipos, adjuntos privados, asociaciones explicitas y limpieza durable | F6.1-F6.3; alcance aprobado en Prompt 11 | Un archivo reutilizado, cuota serializada, reemplazo tras commit y aislamiento por propietario/proyecto | 102 nuevas: archivos, SQL, permisos, UI/admin, diez carreras y migracion; suite integrada y evidencia en 16 |
 | F7: relaciones de personajes (implementada) | Quince tipos interpersonales, direccion explicita, reciprocidad opcional en una fila y CRUD desde ambas fichas | F6; alcance acotado aprobado en Prompt 12 | Sin duplicados exactos/inversos mutuos, sin cruces de proyecto; fichas/roles/menciones/afiliaciones conservados | 94 nuevas: 83 funcionales, diez carreras PostgreSQL, migracion aditiva; QA escritorio/movil y evidencia integrada en 17 |
-| F8: exportar entidades | Reutilizar selector para geografia, organizaciones, entradas, personajes y referencias | F4/F6/F7; D06-D07 | Alcance de seccion/entidad exacto, archivos privados incluidos solo segun seleccion/politica | Matriz entidad/formato, enlaces/adjuntos, aislamiento, orden y grandes volumenes |
+| F8: exportar entidades (implementada) | REFERENCE y doce alcances, con Markdown/DOCX/PDF, documento neutral y snapshot inmutable; sin binarios | F4/F6/F7; alcance aprobado en Prompt 13 | Fichas/catalogos/compendio fieles a la solicitud, historial y lifecycle compartidos, sin cruces ni manuscritos | 88 nuevas: 76 funcionales, 11 carreras y migracion; QA HTTP/Celery/desktop/movil/Word/PDF; detalle en 18 |
 | F9: trial y pago manual | Plan/Subscription/Payment, capacidades calculadas, transicion de cuentas heredadas y cupos configurables | F1/F5; D10-D14/D18-D19 | Trial con un proyecto y todas las funciones; vencido solo lectura/export; pagos manuales auditables | Reloj controlado, cupos concurrentes, cambio de plan y permisos en todas las apps |
 | F10: Stripe y retencion de cuenta | PaymentEvent, webhooks idempotentes, avisos por periodo, conservacion anual y purga auditable | F9; D11-D14/D17 | Pago confirmado mantiene acceso; no doble credito; renovacion cancela purga; avisos sin solapamiento | Firma, repeticion/orden de eventos, pago vs purga, ano bisiesto y ensayo de eliminacion en copia |
 | F11: capacidad y despliegue | Paginacion/carga progresiva, indices medidos, recursos de workers, observabilidad, TLS/static y restauracion | Medicion desde F0; integrar en cada fase | Presupuesto de latencia/RSS fijado y cumplido; check --deploy objetivo; operacion documentada | Datos representativos, EXPLAIN, carga web/export, caida de servicios y restauracion |
@@ -106,9 +106,10 @@ ni limpiar volumenes. No aceptar la destruccion de una base previa a ciegas.
 
 ## Recomendacion para el siguiente prompt
 
-Continuar con **F8: exportacion de entidades**, aprobando primero una matriz
-acotada de entidades/formatos, seleccion y tratamiento de adjuntos privados.
-Reutilizar selector y snapshots; no exportar relaciones por implicacion.
+Definir el alcance de **F9: trial y pago manual**: capacidades, cupos, fechas y
+transicion de cuentas existentes requieren aprobacion antes de implementar.
+F8 ya exporta entidades y relaciones expresamente seleccionadas, sin adjuntos
+binarios ni manuscritos dentro del compendio. Los pagos no forman parte de F8.
 F6.1-F6.4 y F7 estan implementadas: geografia, residencia principal, organizaciones,
 sede principal, afiliaciones, entradas de mundo, referencias privadas y relaciones
 interpersonales. El alcance aprobado de F7 no agrega lugares secundarios,
@@ -117,7 +118,8 @@ Resultados en [13-geography-validation.md](13-geography-validation.md) y
 [14-organizations-validation.md](14-organizations-validation.md) y
 [15-worldbuilding-validation.md](15-worldbuilding-validation.md) y
 [16-references-validation.md](16-references-validation.md) y
-[17-character-relationships-validation.md](17-character-relationships-validation.md).
+[17-character-relationships-validation.md](17-character-relationships-validation.md) y
+[18-world-exports-validation.md](18-world-exports-validation.md).
 F4/F5 estan implementadas: cinco estados, leases renovables,
 reintentos limitados, auditoria, notificacion opcional y borrado/caducidad seguros.
 Markdown, DOCX y PDF son visibles; HTML/EPUB y preview permanecen compatibles.
@@ -229,3 +231,28 @@ ambas fichas, duplicado rechazado, edicion movil, permisos y borrado independien
 Datos temporales retirados y huellas de originales/media identicas. Respaldo
 previo conservado, sin restauracion nueva ni borrado de bases/volumenes.
 Inventario, resultados integrados y limites en el documento 17.
+
+## Cierre F8
+
+Prompt 13 agrega exports.0004_world_exports: alcance en ExportJob, conteo de
+entidades en ExportSnapshot, modalidad REFERENCE y CHECK de combinaciones
+validas. Mantiene las filas, archivos y manifiestos historicos; no agrega tablas.
+El esquema 2 de snapshot guarda secciones con identidad, profundidad, orden,
+texto y estilo; los lectores de esquema 1 WORK/FINAL permanecen compatibles.
+Proyecto y estilo se bloquean durante la captura; el worker solo renderiza el
+documento inmutable y conserva el lifecycle, la cola y el storage de F5.
+
+Doce alcances, tres formatos, referencias solo por metadatos y URLs publicas
+sin credenciales conocidas. Catalogos estables, subarbol opcional, relaciones
+direccionales y mutuas sin inversas inventadas; compendio sin texto literario.
+Limites existentes compartidos, consultas por lotes y arboles iterativos.
+
+Suite integrada: **1093 pruebas aprobadas**, 88 nuevas; 613.870 segundos en
+PostgreSQL. Check limpio, esquema al dia, Celery pong y cinco servicios rootless.
+Ocho solicitudes HTTP antes de editar fuentes/estilo y borrar una entrada;
+archivos de tres formatos conservaron la captura. Novena solicitud desde movil,
+descarga sin navegar fuera del detalle. Aislamiento, caducidad y POST de borrado
+verificados. PDF de cinco paginas inspeccionado y DOCX de cinco paginas en Word.
+Datos temporales retirados; huellas originales y media identicas. Respaldo previo
+conservado, sin ensayo nuevo de restauracion ni borrado de bases/volumenes.
+Resultados, inventario y limites pendientes en el documento 18.

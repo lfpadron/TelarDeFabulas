@@ -30,6 +30,7 @@ def snapshot_summary(queryset):
     return queryset.defer("root_node__content", "root_node__short_description").annotate(
         captured_style=F("snapshot__style_name"), captured_title=F("snapshot__scope_title"),
         included_scenes=F("snapshot__included_scene_count"), excluded_scenes=F("snapshot__excluded_scene_count"),
+        included_entities=F("snapshot__included_entity_count"),
     )
 
 

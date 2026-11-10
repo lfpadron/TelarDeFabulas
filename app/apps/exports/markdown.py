@@ -1,4 +1,5 @@
 import re
+from django.utils.translation import gettext_lazy as _
 
 from .services import heading_level
 from .snapshots import get_export_document
@@ -15,6 +16,9 @@ def escape_prose(text):
 def build_export_markdown(export_job, *, document=None):
     document = document if document is not None else get_export_document(export_job)
     blocks = []
+    if document.style.include_table_of_contents and document.nodes and document.nodes[0].node_type == "REFERENCE":
+        blocks.append(f"# {str(_('Índice'))}")
+        blocks.append("\n".join(f"- {escape_prose(' '.join(node.title.splitlines()))}" for node in document.nodes))
     for node in document.nodes:
         title = " ".join(node.title.splitlines())
         blocks.append(f"{'#' * heading_level(node)} {escape_prose(title)}")

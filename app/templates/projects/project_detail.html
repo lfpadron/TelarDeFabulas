@@ -37,6 +37,7 @@
         <a class="button" href="{% url 'references:list' project.pk %}">{% trans "Referencias y materiales" %}</a>
         <a class="button" href="{% url 'notes:list' project.pk %}">{% trans "Notas, ideas y pendientes" %}</a>
         <a class="button" href="{% url 'exports:list' project.pk %}">{% trans "Exportaciones" %}</a>
+        {% if access.export %}<a class="button" href="{% url 'exports:world_create' project.pk %}">{% trans "Exportar universo narrativo" %}</a>{% endif %}
         {% if access.edit %}
             <a class="button" href="{% url 'projects:edit' project.pk %}">{% trans "Editar" %}</a>
         {% endif %}

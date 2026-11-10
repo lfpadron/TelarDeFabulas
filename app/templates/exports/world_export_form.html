@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Exportar universo narrativo" %} | {{ project.name }}{% endblock %}
+{% block content %}
+<section class="export-page">
+    <h1>{% trans "Exportar universo narrativo" %}</h1>
+    <p><a href="{% url 'projects:detail' project.pk %}">{{ project.name }}</a></p>
+    <form method="post" class="export-form" id="world-export-form" novalidate>
+        {% csrf_token %}
+        {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+        {{ form.non_field_errors }}
+        {% for field in form.visible_fields %}
+        <div class="world-field">
+            {{ field.errors }}
+            {% if field.name == 'include_descendants' or field.name == 'notify_by_email' %}
+            <label for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
+            {% else %}{{ field.label_tag }} {{ field }}{% endif %}
+        </div>
+        {% endfor %}
+        <div class="actions">
+            <button class="button" type="submit">{% trans "Crear exportación" %}</button>
+            <a class="button secondary" href="{% url 'exports:list' project.pk %}">{% trans "Volver a exportaciones" %}</a>
+        </div>
+    </form>
+</section>
+<style>
+    .world-field { margin-bottom: 1.25rem; overflow-wrap: anywhere; }
+    .world-field[hidden] { display: none; }
+    .world-field input:not([type="checkbox"]), .world-field select { box-sizing: border-box; max-width: 100%; }
+    .world-field input[type="checkbox"] { width: 1.1rem; height: 1.1rem; padding: 0; vertical-align: middle; }
+</style>
+<script>
+(() => {
+    "use strict";
+    const form = document.getElementById("world-export-form");
+    const scope = form.elements.scope_kind;
+    function updateFields() {
+        for (const field of form.querySelectorAll("[data-scopes]")) {
+            const active = field.dataset.scopes.split(" ").includes(scope.value);
+            field.disabled = !active;
+            field.closest(".world-field").hidden = !active;
+        }
+    }
+    scope.addEventListener("change", updateFields);
+    updateFields();
+})();
+</script>
+{% endblock %}

@@ -1334,13 +1334,77 @@ Datos temporales retirados; originales y media comprobados por SHA-256.
 Resultado integrado, inventario y limites en
 [17-character-relationships-validation.md](docs/refactoring/17-character-relationships-validation.md).
 
+## Exportar universo narrativo (F8)
+
+Desde el detalle del proyecto, **Exportar universo narrativo** abre
+`/projects/<id>/exports/world/`. Requiere un estilo disponible (propio o del
+sistema); se puede crear uno desde Estilos. No se crean estilos ni datos de
+ejemplo automaticamente.
+
+La nueva modalidad `REFERENCE` genera documentos de consulta en **Markdown,
+DOCX o PDF**. No presenta WORK/FINAL ni estados editoriales de escenas.
+Las exportaciones literarias, HTML/EPUB historicos y preview siguen disponibles.
+
+Alcances:
+- Ficha de personaje o catalogo de personajes.
+- Ubicacion individual, con descendientes opcionales, o geografia completa.
+- Organizacion individual, con subordinadas opcionales, o todas las organizaciones.
+- Entrada de mundo, una categoria (politica/religion/historia) o todas.
+- Referencia individual o catalogo de referencias.
+- Compendio completo, sin manuscritos y omitiendo secciones vacias.
+
+Personajes incluyen roles, residencia, afiliaciones y relaciones direccionales.
+Las relaciones mutuas se representan una vez, sin inventar relaciones inversas.
+Geografia y organizaciones respetan el orden y la jerarquia del autor. Una
+referencia asociada se incorpora una sola vez al catalogo bibliografico; sus
+menciones en otras fichas no repiten la ficha completa. Las asociaciones con
+manuscritos incluyen solo el nombre/identificador de destino, nunca su texto.
+
+La solicitud captura textos, relaciones, sedes, residencia, orden y estilo en un
+snapshot privado e inmutable. Editar o borrar una entidad despues no altera la
+exportacion en cola ni un reintento. El conteo de entidades incluye las fichas
+principales y las referencias bibliograficas anexadas, no las menciones de
+contexto ni las filas de afiliaciones/relaciones.
+
+No se incluyen imagenes ni documentos adjuntos: solo metadatos, descripcion y
+nombre original seguro. No se abren archivos fuente ni se descargan URLs.
+Se omiten URLs estructuradas con credenciales/tokens conocidos o rutas privadas.
+Esto no es un detector de secretos escritos por el autor dentro del texto libre.
+
+El historial es el mismo de las exportaciones literarias: alcance, modalidad,
+formato, estado, fechas, caducidad, descarga como adjunto y eliminacion por POST.
+Conserva leases, heartbeats, reintentos, notificacion opcional y retencion de F5.
+ACTIVE, FROZEN y PENDING_DELETION permiten exportar; DELETED y proyectos ajenos
+devuelven 404. La descarga siempre requiere autorizacion.
+
+Migracion aditiva: `exports.0004_world_exports`. En una instalacion con trafico,
+respaldar PostgreSQL/media y detener web/worker/beat antes de migrar, usando
+`compose run --rm --no-deps web python manage.py migrate`. No revertir el esquema
+cuando existan trabajos REFERENCE: la reversa lo bloquea para no perder su alcance.
+
+```powershell
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py check
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate
+podman --connection telar-fabulas-dev compose exec web python manage.py test apps.exports --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py test --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
+```
+
+F8 aprobo **1093 pruebas integradas**, 88 nuevas (76 funcionales, 11 concurrentes
+y una de migracion). Nueve exportaciones reales por HTTP/navegador y Celery;
+Markdown/DOCX/PDF descargados, snapshot conservado tras ediciones y borrado,
+caducidad y privacidad verificadas. PDF revisado por paginas y DOCX abierto en
+Word. QA retirado; huellas de originales/media identicas. No se borraron bases
+ni volumenes ni se agregaron dependencias. Inventario y limites en
+[18-world-exports-validation.md](docs/refactoring/18-world-exports-validation.md).
+
 ## Siguiente fase sugerida
 
-Continuar con **F8: exportacion de entidades**, definiendo primero la matriz de
-entidades/formatos, seleccion y politica de adjuntos privados. Reutilizar el
-selector y snapshots de exportacion existentes. Exportar relaciones requiere
-alcance aprobado en otra fase; F7 no lo implementa. Tampoco agrega grafos,
-cronologias, inferencias ni relaciones entre organizaciones.
-Suscripciones, comparacion visual y conversiones de FRAGMENT o texto legado
-requieren fases independientes. Antes de produccion faltan TLS, limites de
-recursos, monitorizacion, SMTP real y politica operativa de respaldos/cuotas.
+Definir el alcance de **F9: periodo de prueba y pago manual**, incluyendo
+capacidades, cupos y transicion de cuentas existentes, antes de implementar
+suscripciones. No se agregan cobros ni Stripe en F8. Medir latencia, memoria y
+contencion con proyectos representativos sigue pendiente antes de produccion,
+junto con TLS, estaticos, monitorizacion, SMTP y respaldo externo verificable.

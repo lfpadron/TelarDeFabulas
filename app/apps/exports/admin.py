@@ -17,6 +17,7 @@ class ExportJobAdmin(ProjectOwnedAdmin):
         "user",
         "format",
         "export_mode",
+        "scope_kind",
         "status",
         "style_template",
         "root_node",
@@ -26,7 +27,7 @@ class ExportJobAdmin(ProjectOwnedAdmin):
         "expires_at",
         "notification_sent_at",
     )
-    list_filter = ("format", "export_mode", "status", "created_at", "started_at", "finished_at")
+    list_filter = ("format", "export_mode", "scope_kind", "status", "created_at", "started_at", "finished_at")
     search_fields = (
         "project__name",
         "user__email",

@@ -266,7 +266,7 @@ def render_export_html(
       margin: {css_number(style.margin_top)}mm {css_number(style.margin_right)}mm {css_number(style.margin_bottom)}mm {css_number(style.margin_left)}mm;
       text-align: {text_alignment};
     }}
-    h1, h2, h3, h4 {{
+    h1, h2, h3, h4, h5, h6 {{
       font-family: '{css_font_name(style.font_heading)}', {fallback_family};
       font-size: {css_number(style.heading_size)}pt;
       line-height: 1.2;
@@ -277,6 +277,7 @@ def render_export_html(
       margin: 0 0 {css_number(style.paragraph_spacing)}pt;
       text-indent: {css_number(style.first_line_indent)}mm;
     }}
+    .node-reference {{ overflow-wrap: anywhere; }}
     .toc {{
       border-bottom: 1px solid #d0d0d0;
       margin-bottom: 2rem;

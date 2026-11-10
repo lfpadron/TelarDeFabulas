@@ -15,7 +15,7 @@ from .models import ExportJob
 class ExportJobForm(forms.ModelForm):
     request_key = forms.UUIDField(widget=forms.HiddenInput, initial=uuid4)
     selection_confirmation = forms.CharField(widget=forms.HiddenInput, required=False)
-    export_mode = forms.ChoiceField(label=_("Modalidad"), choices=ExportJob.ExportMode.choices,
+    export_mode = forms.ChoiceField(label=_("Modalidad"), choices=ExportJob.ExportMode.choices[:2],
                                     widget=forms.RadioSelect, initial="WORK", required=False)
     class Meta:
         model = ExportJob
@@ -91,7 +91,7 @@ class ExportJobForm(forms.ModelForm):
 
 
 class ExportPreviewForm(forms.Form):
-    export_mode = forms.ChoiceField(label=_("Modalidad"), choices=ExportJob.ExportMode.choices,
+    export_mode = forms.ChoiceField(label=_("Modalidad"), choices=ExportJob.ExportMode.choices[:2],
                                     widget=forms.RadioSelect, initial="WORK", required=False)
     root_node = forms.ModelChoiceField(
         label=_("Nodo raíz"),
