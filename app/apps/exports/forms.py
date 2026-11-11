@@ -34,7 +34,7 @@ class ExportJobForm(forms.ModelForm):
             self.instance.user = user
         if project is not None:
             self.instance.project = project
-            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).only("id", "project_id", "title", "node_type", "position").order_by(
+            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).visible().only("id", "project_id", "title", "node_type", "position").order_by(
                 "parent_id",
                 "position",
                 "title",
@@ -109,7 +109,7 @@ class ExportPreviewForm(forms.Form):
         self.project = project
         super().__init__(*args, **kwargs)
         if project is not None:
-            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).only("id", "project_id", "title", "node_type", "position").order_by(
+            self.fields["root_node"].queryset = ManuscriptNode.objects.filter(project=project).visible().only("id", "project_id", "title", "node_type", "position").order_by(
                 "parent_id",
                 "position",
                 "title",

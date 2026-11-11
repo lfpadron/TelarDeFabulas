@@ -30,6 +30,7 @@
     <div class="actions">
         <a class="button secondary" href="{% url 'projects:list' %}">{% trans "Volver" %}</a>
         <a class="button" href="{% url 'manuscripts:tree' project.pk %}">{% trans "Manuscrito" %}</a>
+        <a class="button secondary" href="{% url 'manuscripts:trash' project.pk %}">{% trans "Papelera" %}</a>
         <a class="button" href="{% url 'characters:list' project.pk %}">{% trans "Índice de personajes" %}</a>
         <a class="button" href="{% url 'geography:tree' project.pk %}">{% trans "Geografía" %}</a>
         <a class="button" href="{% url 'organizations:tree' project.pk %}">{% trans "Organizaciones" %}</a>

@@ -15,11 +15,12 @@ from .forms import ManuscriptNodeForm, ManuscriptNodeMoveForm
 from .hierarchy import ALLOWED_CHILD_TYPES, LEGACY_MESSAGE, editable_node_ids, load_structure, ordered_tree
 from .models import ManuscriptNode, SceneVersion
 from .services import move_node, move_node_down, move_node_up
+from .trash import soft_delete_node
 from .version_services import get_current_draft_version, get_current_final_version, select_scene_versions
 
 
 def get_project_node(project, node_pk):
-    return get_object_or_404(ManuscriptNode, pk=node_pk, project=project)
+    return get_object_or_404(ManuscriptNode.objects.filter(project=project).visible(), pk=node_pk)
 
 
 def require_editable_node(node):
@@ -49,7 +50,7 @@ def build_tree_rows(nodes):
                      "can_move_up": movable and index > 0,
                      "can_move_down": movable and index < len(siblings) - 1,
                      "can_create_child": node.pk in editable and bool(ALLOWED_CHILD_TYPES.get(node.node_type)),
-                     "can_delete": movable and not children_by_parent.get(node.pk)})
+                     "can_delete": movable})
     return rows
 
 
@@ -75,14 +76,14 @@ def get_parent_from_request_or_404(project, raw_parent):
         int(raw_parent)
     except (TypeError, ValueError):
         raise Http404(_("Nuevo padre no encontrado."))
-    return get_object_or_404(ManuscriptNode, pk=raw_parent, project=project)
+    return get_object_or_404(ManuscriptNode.objects.filter(project=project).visible(), pk=raw_parent)
 
 
 @login_required
 @project_access()
 def manuscript_tree(request, project_pk):
     project = request.project
-    nodes = ManuscriptNode.objects.filter(project=project).defer("content").order_by("position", "created_at", "pk")
+    nodes = ManuscriptNode.objects.filter(project=project).visible().defer("content").order_by("position", "created_at", "pk")
     rows = build_tree_rows(nodes)
     return render(
         request,
@@ -139,7 +140,7 @@ def node_detail(request, project_pk, node_pk):
     project = request.project
     node = get_project_node(project, node_pk)
     node_mentions = node.character_mentions.filter(character__project=project).select_related("character").order_by("character__name", "mention_type")
-    row = next(row for row in build_tree_rows(ManuscriptNode.objects.filter(project=project).defer("content").order_by("position", "created_at", "pk")) if row["node"].pk == node.pk)
+    row = next(row for row in build_tree_rows(ManuscriptNode.objects.filter(project=project).visible().defer("content").order_by("position", "created_at", "pk")) if row["node"].pk == node.pk)
     draft = get_current_draft_version(node) if node.node_type == "SCENE" else None
     final = get_current_final_version(node) if node.node_type == "SCENE" else None
     working = draft or final
@@ -200,17 +201,13 @@ def node_delete(request, project_pk, node_pk):
     project = request.project
     node = get_project_node(project, node_pk)
     require_editable_node(node)
-    if node.children.exists():
-        messages.error(request, _("No puedes borrar un nodo que tiene hijos. Borra o mueve primero sus hijos."))
-        return redirect("manuscripts:detail", project_pk=project.pk, node_pk=node.pk)
-
     if request.method == "POST":
         try:
-            node.delete()
+            soft_delete_node(node, user=request.user)
         except ValidationError as error:
             messages.error(request, " ".join(error.messages))
             return redirect("manuscripts:detail", project_pk=project.pk, node_pk=node.pk)
-        messages.success(request, _("Nodo borrado correctamente."))
+        messages.success(request, _("Nodo enviado a la papelera. Sus versiones y vínculos se conservan."))
         return redirect("manuscripts:tree", project_pk=project.pk)
 
     return render(request, "manuscripts/node_confirm_delete.html", {"project": project, "node": node})

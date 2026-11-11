@@ -22,7 +22,7 @@ from .views import require_editable_node
 
 
 def get_scene(request, node_pk, *, writing=False):
-    scene = get_object_or_404(ManuscriptNode, pk=node_pk, project=request.project, node_type="SCENE")
+    scene = get_object_or_404(ManuscriptNode.objects.filter(project=request.project).visible(), pk=node_pk, node_type="SCENE")
     if writing:
         require_editable_node(scene)
     return scene

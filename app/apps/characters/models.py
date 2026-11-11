@@ -256,6 +256,9 @@ class CharacterMention(models.Model):
             validate_project_action(self.character.project)
         if self.character_id and self.node_id and self.character.project_id != self.node.project_id:
             raise ValidationError(_("El personaje y el nodo deben pertenecer al mismo proyecto."))
+        if self.node_id:
+            from apps.manuscripts.visibility import require_visible_node
+            require_visible_node(self.node)
         if self.character_id and self.node_id and self.mention_type:
             duplicate_mentions = self.__class__.objects.filter(
                 character_id=self.character_id,
@@ -268,8 +271,13 @@ class CharacterMention(models.Model):
                 raise ValidationError(_("Ya existe una mención idéntica para este personaje, nodo y tipo."))
 
     def save(self, *args, **kwargs):
-        self.full_clean()
-        return super().save(*args, **kwargs)
+        from apps.manuscripts.services import lock_project
+
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            lock_project(self.character.project_id, using=using)
+            self.full_clean()
+            return super().save(*args, **kwargs)
 
 
 class CharacterRelationship(models.Model):

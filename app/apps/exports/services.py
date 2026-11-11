@@ -55,7 +55,7 @@ def css_alignment(style):
 
 def ordered_project_nodes(project, root_node=None, *, mode="WORK"):
     nodes = list(
-        ManuscriptNode.objects.filter(project=project)
+        ManuscriptNode.objects.filter(project=project).visible()
         .order_by("position", "created_at", "pk")
     )
     nodes_by_id = {node.id: node for node in nodes}

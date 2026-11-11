@@ -9,6 +9,7 @@ from apps.core.permissions import check_project_permission
 
 from .hierarchy import validate_node_hierarchy
 from .models import ManuscriptNode, SceneVersion, count_words
+from .visibility import require_visible_node
 from .services import lock_project
 
 
@@ -22,6 +23,7 @@ def _lock_scene(scene, user):
     project = lock_project(scene.project_id, using=using, user=user)
     check_project_permission(user, project, "EDIT")
     current = ManuscriptNode.objects.using(using).select_for_update().get(pk=scene.pk, project=project)
+    require_visible_node(current)
     if current.node_type != ManuscriptNode.NodeType.SCENE:
         raise ValidationError(_("Las versiones solo pueden pertenecer a una escena."))
     current.project = project
@@ -143,5 +145,6 @@ def select_scene_versions(scenes, *, mode="WORK", include_content=True):
 
 
 def get_scene_content_for_export(scene, *, mode="WORK"):
+    require_visible_node(scene)
     version = select_scene_versions([scene], mode=mode).get(scene.pk)
     return version["content"] if version else ""

@@ -75,7 +75,7 @@ def request_export(*, user, project, style_template, root_node=None, export_form
             return previous
         style = get_object_or_404(StyleTemplate.objects.select_for_update().filter(Q(is_system=True) | Q(user=user)), pk=style_template.pk)
         if root_node is not None:
-            root_node = get_object_or_404(ManuscriptNode, pk=root_node.pk, project=project)
+            root_node = get_object_or_404(ManuscriptNode.objects.filter(project=project).visible(), pk=root_node.pk)
         job = ExportJob(user=user, project=project, style_template=style, root_node=root_node,
                         format=export_format, export_mode=export_mode, scope_kind=scope_kind, request_key=key, notify_by_email=notify_by_email)
         job.full_clean()

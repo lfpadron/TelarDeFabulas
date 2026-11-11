@@ -31,7 +31,7 @@ def get_project_character(project, character_pk):
 
 def get_project_mention(project, mention_pk):
     return get_object_or_404(
-        CharacterMention.objects.select_related("character", "node"),
+        local_project_relations(CharacterMention.objects.filter(character__project=project).select_related("character", "node"), "character__project"),
         pk=mention_pk,
         character__project=project,
         node__project=project,
@@ -45,7 +45,10 @@ def get_reference_for_project(model, project, raw_pk, error_message):
         int(raw_pk)
     except (TypeError, ValueError):
         raise Http404(error_message)
-    return get_object_or_404(model, pk=raw_pk, project=project)
+    query = model.objects.filter(project=project)
+    if model is ManuscriptNode:
+        query = query.visible()
+    return get_object_or_404(query, pk=raw_pk)
 
 
 def safe_next_url(request):
@@ -76,13 +79,14 @@ def mention_return_url(request, project, mention=None, initial_character=None, i
 @project_access()
 def character_list(request, project_pk):
     project = request.project
+    visible_nodes = ManuscriptNode.objects.filter(project=project).visible()
     characters = (
         Character.objects.filter(project=project)
         .annotate(
-            mention_count=Count("mentions", filter=Q(mentions__node__project=project), distinct=True),
+            mention_count=Count("mentions", filter=Q(mentions__node__in=visible_nodes), distinct=True),
             appearance_count=Count(
                 "mentions",
-                filter=Q(mentions__mention_type=CharacterMention.MentionType.APPEARS, mentions__node__project=project),
+                filter=Q(mentions__mention_type=CharacterMention.MentionType.APPEARS, mentions__node__in=visible_nodes),
                 distinct=True,
             ),
         )
@@ -124,7 +128,7 @@ def character_detail(request, project_pk, character_pk):
     project = request.project
     character = get_project_character(project, character_pk)
     linked_notes = local_project_relations(character.work_notes.filter(project=project)).select_related("node").order_by("-updated_at", "title")
-    character_mentions = character.mentions.filter(node__project=project).select_related("node").order_by(
+    character_mentions = local_project_relations(character.mentions.filter(node__project=project), "character__project").select_related("node").order_by(
         "node__parent_id",
         "node__position",
         "node__title",

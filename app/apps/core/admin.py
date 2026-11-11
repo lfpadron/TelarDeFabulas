@@ -51,6 +51,8 @@ class ProjectOwnedAdmin(admin.ModelAdmin):
             kwargs["queryset"] = projects
         elif "project" in fields:
             kwargs["queryset"] = model.objects.filter(project__in=projects)
+            if model._meta.label_lower == "manuscripts.manuscriptnode":
+                kwargs["queryset"] = kwargs["queryset"].visible()
         elif model._meta.label_lower == "accounts.user":
             kwargs["queryset"] = model.objects.filter(pk=request.user.pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)

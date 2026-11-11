@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Restaurar" %} | {{ item.node.display_title }}{% endblock %}
+{% block content %}
+<section class="scene-version manuscript-trash">
+    <h1>{% trans "Restaurar" %}: {{ item.node.display_title }}</h1>
+    <p>{% blocktrans with count=item.affected_count %}Descendientes afectados: {{ count }}.{% endblocktrans %}</p>
+    <p>{% trans "Las eliminaciones independientes anteriores permanecerán en la papelera." %}</p>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="actions">
+            <button class="button" type="submit">{% trans "Confirmar restauración" %}</button>
+            <a class="button secondary" href="{% url 'manuscripts:trash' project.pk %}">{% trans "Cancelar" %}</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

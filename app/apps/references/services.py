@@ -228,4 +228,5 @@ def get_references_for_entity(entity, *, user=None):
     from .selectors import project_associations
     if user is not None:
         check_project_permission(user, entity.project)
-    return project_associations(entity.project).filter(**{entity_field(entity): entity})
+    field = entity_field(entity)
+    return project_associations(entity.project, include_hidden=field != "manuscript_node").filter(**{field: entity})

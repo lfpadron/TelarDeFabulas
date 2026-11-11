@@ -1,5 +1,6 @@
 import re
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Max
@@ -20,7 +21,16 @@ def count_words(text):
     return len(WORD_RE.findall(text))
 
 
+class ManuscriptNodeQuerySet(models.QuerySet):
+    def visible(self):
+        from .visibility import hidden_node_ids
+
+        projects = self.order_by().values("project_id").distinct()
+        return self.exclude(pk__in=hidden_node_ids(projects, self.db))
+
+
 class ManuscriptNode(models.Model):
+    objects = ManuscriptNodeQuerySet.as_manager()
     class NodeType(models.TextChoices):
         BOOK = "BOOK", _("Libro")
         PART = "PART", _("Parte")
@@ -75,6 +85,9 @@ class ManuscriptNode(models.Model):
     )
     created_at = models.DateTimeField(_("creado"), auto_now_add=True)
     updated_at = models.DateTimeField(_("actualizado"), auto_now=True)
+    deleted_at = models.DateTimeField(_("eliminado"), null=True, blank=True, editable=False)
+    deleted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name="+", editable=False, verbose_name=_("eliminado por"))
 
     class Meta:
         verbose_name = _("nodo de manuscrito")
@@ -84,6 +97,7 @@ class ManuscriptNode(models.Model):
             models.Index(fields=["project", "parent", "position"]),
             models.Index(fields=["project", "node_type"]),
             models.Index(fields=["project", "status"]),
+            models.Index(fields=["project", "deleted_at"], name="manuscript_project_trash_idx"),
         ]
 
     def __str__(self):
@@ -142,7 +156,7 @@ class ManuscriptNode(models.Model):
 
     @classmethod
     def siblings(cls, project, parent):
-        return cls.objects.filter(project=project, parent=parent)
+        return cls.objects.filter(project=project, parent=parent).visible()
 
     @classmethod
     def next_position(cls, project, parent):
@@ -163,7 +177,14 @@ class ManuscriptNode(models.Model):
         return delete_node(self, using=using, keep_parents=keep_parents)
 
     def can_delete_safely(self):
-        return not self.children.exists()
+        from .visibility import require_visible_node
+
+        try:
+            require_visible_node(self)
+            validate_node_hierarchy(self)
+        except ValidationError:
+            return False
+        return True
 
 
 class SceneVersion(models.Model):

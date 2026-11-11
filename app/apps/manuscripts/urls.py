@@ -1,11 +1,14 @@
 from django.urls import path
 
-from . import views, version_views
+from . import views, version_views, trash_views
 
 
 app_name = "manuscripts"
 
 urlpatterns = [
+    path("projects/<int:project_pk>/manuscript/trash/", trash_views.trash_list, name="trash"),
+    path("projects/<int:project_pk>/manuscript/trash/<int:node_pk>/", trash_views.trash_detail, name="trash_detail"),
+    path("projects/<int:project_pk>/manuscript/trash/<int:node_pk>/restore/", trash_views.trash_restore, name="trash_restore"),
     path("projects/<int:project_pk>/manuscript/<int:node_pk>/versions/", version_views.version_history, name="version_history"),
     path("projects/<int:project_pk>/manuscript/<int:node_pk>/versions/create/", version_views.version_create, name="version_create"),
     path("projects/<int:project_pk>/manuscript/<int:node_pk>/versions/<int:version_pk>/", version_views.version_detail, name="version_detail"),

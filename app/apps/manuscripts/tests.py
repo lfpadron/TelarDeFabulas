@@ -179,15 +179,16 @@ class ManuscriptNodeTests(TestCase):
         self.assertEqual(first.position, 1)
         self.assertEqual(second.position, 2)
 
-    def test_cannot_delete_node_with_children(self):
+    def test_can_soft_delete_node_with_children(self):
         parent = ManuscriptNode.objects.create(project=self.project, title="Padre")
         ManuscriptNode.objects.create(project=self.project, parent=parent, node_type="CHAPTER", title="Hijo")
         self.client.force_login(self.user)
 
         response = self.client.post(self.delete_url(parent))
 
-        self.assertRedirects(response, self.detail_url(parent))
+        self.assertRedirects(response, self.tree_url())
         self.assertTrue(ManuscriptNode.objects.filter(pk=parent.pk).exists())
+        self.assertFalse(ManuscriptNode.objects.filter(pk=parent.pk).visible().exists())
 
     def test_can_delete_node_without_children(self):
         node = ManuscriptNode.objects.create(project=self.project, title="Hoja")
@@ -196,7 +197,8 @@ class ManuscriptNodeTests(TestCase):
         response = self.client.post(self.delete_url(node))
 
         self.assertRedirects(response, self.tree_url())
-        self.assertFalse(ManuscriptNode.objects.filter(pk=node.pk).exists())
+        self.assertTrue(ManuscriptNode.objects.filter(pk=node.pk, deleted_at__isnull=False).exists())
+        self.assertFalse(ManuscriptNode.objects.filter(pk=node.pk).visible().exists())
 
     def test_cannot_create_node_in_deleted_project(self):
         self.project.status = Project.ProjectStatus.DELETED

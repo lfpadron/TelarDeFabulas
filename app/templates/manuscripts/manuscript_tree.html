@@ -16,6 +16,7 @@
 
     <div class="actions">
         <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        <a class="button secondary" href="{% url 'manuscripts:trash' project.pk %}">{% trans "Papelera" %}</a>
         <a class="button secondary" href="{% url 'exports:preview' project.pk %}">{% trans "Previsualizar HTML" %}</a>
         <a class="button" href="{% url 'exports:create' project.pk %}">{% trans "Exportar manuscrito" %}</a>
         {% if access.create and can_create_book %}
@@ -77,7 +78,7 @@
                                                 <button type="submit">{% trans "Bajar" %}</button>
                                             </form>
                                         {% endif %}
-                                        {% if row.can_delete %}<a href="{% url 'manuscripts:delete' project.pk row.node.pk %}">{% trans "Borrar" %}</a>{% endif %}
+                                        {% if row.can_delete %}<a href="{% url 'manuscripts:delete' project.pk row.node.pk %}">{% trans "Enviar a papelera" %}</a>{% endif %}
                                     {% endif %}
                                 </div>
                             </td>

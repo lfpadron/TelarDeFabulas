@@ -462,5 +462,5 @@ class SceneVersionTests(SecurityTestCase):
 
     def test_scene_deletion_confirmation_warns_about_version_history(self):
         response = self.client.get(self.url("manuscripts:delete", node_pk=self.scene.pk))
-        self.assertContains(response, "incluidas sus definitivas")
+        self.assertContains(response, "todas sus versiones, notas y menciones se conservarán")
         self.assertEqual(self.scene.versions.count(), 1)

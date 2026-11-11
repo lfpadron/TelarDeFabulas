@@ -100,6 +100,8 @@ class AssociationForm(forms.ModelForm):
             self.initial["reference"] = reference.pk
         for key, (label, *_) in TARGETS.items():
             query = local_project_relations(apps.get_model(label).objects.filter(project=project))
+            if key == "manuscript_node":
+                query = query.visible()
             title = "title" if key in ("manuscript_node", "worldbuilding_entry") else "name"
             fields = ["id", title] + (["node_type"] if key == "manuscript_node" else [])
             self.fields[key].queryset = query.only(*fields).order_by(title, "pk")

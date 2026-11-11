@@ -32,7 +32,10 @@ def selected_entity(request):
     key, value = selected[0]
     if not value or not value.isascii() or not value.isdigit() or len(value) > 18:
         raise Http404
-    return get_object_or_404(local_project_relations(apps.get_model(TARGETS[key][0]).objects.filter(project=request.project)), pk=value)
+    query = local_project_relations(apps.get_model(TARGETS[key][0]).objects.filter(project=request.project))
+    if key == "manuscript_node":
+        query = query.visible()
+    return get_object_or_404(query, pk=value)
 
 
 def get_reference(request, pk):

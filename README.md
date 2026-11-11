@@ -308,10 +308,10 @@ titulo; una escena puede guardarlo vacio y mostrar `Escena N` segun su posicion,
 sin persistir esa etiqueta. Todos incluyen `short_description` en creacion,
 edicion y detalle; el arbol muestra una version abreviada.
 
-El borrado de nodos de manuscrito es físico en esta fase, pero solo se permite borrar nodos sin hijos.
-La confirmacion de borrado de una escena advierte que tambien elimina todas sus
-versiones, incluidas las definitivas, por CASCADE. No existe borrado individual
-de versiones. Archivo y recuperacion de escenas eliminadas quedan pendientes.
+Desde F9, enviar un nodo a papelera es una eliminacion logica, tambien con hijos.
+Conserva IDs, contenido, todas las versiones y sus vinculos. Se recupera desde
+Proyecto -> Papelera. No hay borrado fisico de manuscritos desde web/admin ni
+borrado individual de versiones; los detalles de recuperacion estan al final.
 
 Reordenamiento visual v01:
 
@@ -1401,10 +1401,68 @@ Word. QA retirado; huellas de originales/media identicas. No se borraron bases
 ni volumenes ni se agregaron dependencias. Inventario y limites en
 [18-world-exports-validation.md](docs/refactoring/18-world-exports-validation.md).
 
+## Papelera de manuscritos (F9)
+
+Proyecto -> **Papelera**, o `/projects/<id>/manuscript/trash/`, permite consultar
+y recuperar libros, partes, capitulos y escenas. El arbol y el detalle ofrecen
+**Enviar a papelera**, con confirmacion POST/CSRF. No existe borrado definitivo
+ni caducidad automatica del contenido literario.
+
+Solo el nodo eliminado directamente recibe `deleted_at` y `deleted_by`. Sus
+descendientes quedan ocultos por ancestro, sin cambiar sus registros ni versiones.
+Restaurar el ancestro recupera los descendientes activos, pero no los eliminados
+independientemente antes. Ejemplo: eliminar A, eliminar capitulo y restaurar
+capitulo recupera B, no A. A se puede restaurar por separado.
+
+La restauracion conserva el ID y admite un destino compatible del mismo proyecto.
+Si el padre original esta oculto, se requiere otro padre activo; nunca se
+restauran automaticamente los ancestros. Se normaliza el orden visible, sin
+reescribir texto, numeros/revisiones/fechas de versiones, borrador activo ni
+definitiva vigente. La ubicacion mostrada se calcula desde los padres conservados,
+no desde un historial independiente de nombres y movimientos de ancestros.
+
+ACTIVE permite consultar, eliminar y restaurar. FROZEN/PENDING_DELETION permiten
+consultar la papelera, pero no restaurar contenido; DELETED y proyectos ajenos
+devuelven 404. Esto no cambia la restauracion del propio proyecto. El admin
+distingue activo/eliminado/oculto; no ofrece borrado fisico ni restauracion masiva.
+Para restaurar se utiliza la pantalla del autor y el mismo servicio transaccional.
+
+Nodos ocultos no aparecen en vistas, selectores, nuevas notas/menciones,
+referencias, WORK/FINAL ni preview. Notas, menciones y asociaciones existentes
+permanecen en PostgreSQL y vuelven a verse al recuperar el nodo. Los snapshots y
+archivos de exportaciones ya solicitadas no se modifican por enviar a papelera.
+
+Migracion aditiva: `manuscripts.0005_manuscript_trash`, dos campos e indice.
+Los registros previos permanecen activos. Respaldar PostgreSQL/media y revisar
+el plan antes de migrar; en un despliegue con trafico detener web/worker/beat y
+usar `compose run --rm --no-deps web python manage.py migrate`. Mantener el esquema
+si se vuelve a una version anterior: quitar los campos publicaria de nuevo nodos
+ocultos. La reversa se bloquea mientras haya eliminaciones directas.
+
+```powershell
+podman --connection telar-fabulas-dev compose up -d --build
+podman --connection telar-fabulas-dev compose exec web python manage.py check
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate --plan
+podman --connection telar-fabulas-dev compose exec web python manage.py migrate
+podman --connection telar-fabulas-dev compose exec web python manage.py test --keepdb --noinput
+podman --connection telar-fabulas-dev compose exec web python manage.py makemigrations --check --dry-run
+podman --connection telar-fabulas-dev compose exec worker celery -A config inspect ping
+```
+
+No ejecutar suites simultaneas contra `test_telar_fabulas`. No usar `down -v`,
+reinicializar volumenes ni restaurar un dump antiguo sobre trabajo posterior.
+F9 aprobo **1170 pruebas integradas**, 77 nuevas (67 funcionales, nueve de
+concurrencia y una de migracion). Recuperacion real en escritorio/movil, seis
+versiones intactas y seis exportaciones WORK/FINAL verificadas con Celery. Se
+retiraron solo datos QA; huellas originales iguales. Check limpio, sin cambios
+de esquema pendientes y Celery pong.
+Resultados, inventario de archivos, respaldo y limites en
+[19-manuscript-trash-validation.md](docs/refactoring/19-manuscript-trash-validation.md).
+
 ## Siguiente fase sugerida
 
-Definir el alcance de **F9: periodo de prueba y pago manual**, incluyendo
-capacidades, cupos y transicion de cuentas existentes, antes de implementar
-suscripciones. No se agregan cobros ni Stripe en F8. Medir latencia, memoria y
-contencion con proyectos representativos sigue pendiente antes de produccion,
-junto con TLS, estaticos, monitorizacion, SMTP y respaldo externo verificable.
+Consolidar operacion y capacidad: respaldos externos con restauracion periodica,
+mediciones con manuscritos grandes, TLS/estaticos y monitorizacion. La fase de
+periodo de prueba/pago manual queda pospuesta y requiere definir capacidades,
+cupos y transicion de cuentas. F9 es papelera, no suscripciones; no se agregan
+cobros, Stripe, purga de fuentes ni papelera general.

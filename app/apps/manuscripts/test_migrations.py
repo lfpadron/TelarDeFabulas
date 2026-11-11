@@ -36,6 +36,8 @@ class HierarchyMigrationTests(TransactionTestCase):
         after = apps.get_model("manuscripts", "ManuscriptNode").objects.values().get(pk=fragment.pk)
         self.assertEqual(after.pop("short_description"), "")
         self.assertIsNone(after.pop("current_draft_version_id"))
+        self.assertIsNone(after.pop("deleted_at"))
+        self.assertIsNone(after.pop("deleted_by_id"))
         self.assertEqual(after, before)
         self.assertEqual(apps.get_model("notes", "Note").objects.get(pk=note.pk).node_id, fragment.pk)
         self.assertEqual(apps.get_model("characters", "CharacterMention").objects.get(pk=mention.pk).node_id, fragment.pk)

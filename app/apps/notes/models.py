@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -93,6 +93,9 @@ class Note(models.Model):
             validate_project_action(self.project)
         if self.node_id and self.node.project_id != self.project_id:
             raise ValidationError({"node": _("El nodo debe pertenecer al mismo proyecto que la nota.")})
+        if self.node_id:
+            from apps.manuscripts.visibility import require_visible_node
+            require_visible_node(self.node)
         if self.character_id and self.character.project_id != self.project_id:
             raise ValidationError({"character": _("El personaje debe pertenecer al mismo proyecto que la nota.")})
 
@@ -103,6 +106,11 @@ class Note(models.Model):
             self.completed_at = None
 
     def save(self, *args, **kwargs):
-        self.sync_completed_at()
-        self.full_clean()
-        return super().save(*args, **kwargs)
+        from apps.manuscripts.services import lock_project
+
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            self.project = lock_project(self.project_id, using=using)
+            self.sync_completed_at()
+            self.full_clean()
+            return super().save(*args, **kwargs)

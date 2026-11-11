@@ -88,6 +88,8 @@ class SceneVersionMigrationTests(TransactionTestCase):
         after = {}
         for row in self.Node.objects.values():
             row.pop("current_draft_version_id")
+            self.assertIsNone(row.pop("deleted_at"))
+            self.assertIsNone(row.pop("deleted_by_id"))
             after[row["id"]] = row
         self.assertEqual(after, self.before)
         self.assertFalse(self.Version.objects.exclude(scene__node_type="SCENE").exists())

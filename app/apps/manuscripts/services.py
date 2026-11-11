@@ -8,10 +8,11 @@ from apps.projects.models import Project
 
 from .hierarchy import ALLOWED_CHILD_TYPES, editable_node_ids, load_structure, validate_node_hierarchy
 from .models import ManuscriptNode, count_words
+from .visibility import require_visible_node
 
 
 def sibling_queryset(project, parent):
-    return ManuscriptNode.objects.using(project._state.db).filter(project=project, parent=parent)
+    return ManuscriptNode.objects.using(project._state.db).filter(project=project, parent=parent).visible()
 
 
 def ordered_siblings(project, parent):
@@ -32,6 +33,8 @@ def validate_parent_for_node(node, new_parent):
     validate_project_action(node.project)
     if new_parent is not None and new_parent.project_id != node.project_id:
         raise ValidationError(_("El nuevo padre debe pertenecer al mismo proyecto."))
+    if new_parent is not None:
+        require_visible_node(new_parent)
     candidate = ManuscriptNode(project=node.project, parent=new_parent, node_type=node.node_type,
                                title=node.title, position=node.position)
     candidate.pk = node.pk
@@ -46,7 +49,7 @@ def get_valid_parent_queryset(project, node=None, *, node_type=None):
     ids = editable_node_ids(structure)
     if node and node.pk:
         ids.difference_update({node.pk, *node.descendant_ids()})
-    return ManuscriptNode.objects.filter(project=project, pk__in=ids, node_type__in=valid_types).order_by("parent_id", "position", "created_at", "pk")
+    return ManuscriptNode.objects.filter(project=project, pk__in=ids, node_type__in=valid_types).visible().order_by("parent_id", "position", "created_at", "pk")
 
 
 def _checked_siblings(project, parent, *, exclude_pk=None):
@@ -96,11 +99,14 @@ def save_node(node, *args, **kwargs):
         return
     with transaction.atomic(using=using):
         project = lock_project(node.project_id, using=using)
+        if node.deleted_at is not None or node.deleted_by_id is not None:
+            raise ValidationError(_("La papelera solo se modifica mediante sus servicios."))
         existing = None
         if not node._state.adding:
             existing = ManuscriptNode.objects.using(using).select_for_update().get(pk=node.pk)
             if existing.project_id != project.pk:
                 raise ValidationError(_("No se permite trasladar nodos a otro proyecto."))
+            require_visible_node(existing)
             loaded = getattr(node, "_loaded_structure", {})
             # Text-only saves preserve a move committed since this instance was loaded.
             for name in ("parent_id", "node_type", "position"):
@@ -125,6 +131,8 @@ def save_node(node, *args, **kwargs):
                 raise ValidationError(_("La versión de trabajo se selecciona mediante los servicios de versiones."))
             node.current_draft_version_id = existing.current_draft_version_id
         node.project = project
+        if node.parent_id:
+            require_visible_node(node.parent)
         if existing is None or node.node_type != "SCENE":
             node.word_count = count_words(node.content)
         node.full_clean()
@@ -150,13 +158,15 @@ def save_node(node, *args, **kwargs):
         return result
 
 
-def _locked_node(node, *, user=None):
+def _locked_node(node, *, user=None, allow_hidden=False):
     using = node._state.db or "default"
     project = lock_project(node.project_id, using=using, user=user)
     current = ManuscriptNode.objects.using(using).select_for_update().get(pk=node.pk)
     if current.project_id != project.pk:
         raise ValidationError(_("No se permite trasladar nodos a otro proyecto."))
     current.project = project
+    if not allow_hidden:
+        require_visible_node(current)
     return current
 
 
@@ -202,17 +212,9 @@ def move_node_down(node, *, user=None):
 
 
 def delete_node(node, *, using=None, keep_parents=False, user=None):
-    using = using or node._state.db or "default"
-    with transaction.atomic(using=using):
-        current = _locked_node(node, user=user)
-        validate_node_hierarchy(current)
-        if current.children.exists():
-            raise ValidationError(_("No puedes borrar un nodo que tiene hijos."))
-        siblings = _checked_siblings(current.project, current.parent, exclude_pk=current.pk)
-        result = models.Model.delete(current, using=using, keep_parents=keep_parents)
-        _write_positions(siblings, using)
-        node.pk = None
-        return result
+    from .trash import soft_delete_node
+
+    return soft_delete_node(node, user=user, using=using)
 
 
 def sibling_move_flags(node):

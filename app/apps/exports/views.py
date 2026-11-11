@@ -176,7 +176,7 @@ def preview_selection(user, project, style, *, root=None, mode="WORK"):
         project = get_user_project(user, project.pk, Action.EXPORT, for_update=True)
         style = get_object_or_404(StyleTemplate.objects.select_for_update().filter(Q(is_system=True) | Q(user=user)), pk=style.pk)
         if root:
-            root = get_object_or_404(ManuscriptNode, pk=root.pk, project=project)
+            root = get_object_or_404(ManuscriptNode.objects.filter(project=project).visible(), pk=root.pk)
         document = document_from_manifest(build_manifest(project, style, root_node=root, mode=mode,
                                                         max_nodes=settings.EXPORT_PREVIEW_MAX_NODES))
     return render_export_html(document=document, max_words=settings.EXPORT_PREVIEW_MAX_WORDS, preview_mode=True)

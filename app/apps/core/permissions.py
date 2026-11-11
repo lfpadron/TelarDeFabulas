@@ -92,6 +92,11 @@ def get_user_project(user, project_pk, action=Action.VIEW, *, for_update=False):
 def local_project_relations(queryset, project_path="project"):
     """Broken legacy links must not reveal another project's titles or content."""
     for field in queryset.model._meta.fields:
+        if field.name == "node" and field.related_model._meta.label_lower == "manuscripts.manuscriptnode":
+            from apps.manuscripts.visibility import hidden_node_ids
+
+            hidden = hidden_node_ids(queryset.order_by().values(f"{project_path}_id"), queryset.db)
+            queryset = queryset.exclude(node_id__in=hidden)
         if field.name == "style_template":
             queryset = queryset.filter(
                 Q(style_template__is_system=True)

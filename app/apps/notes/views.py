@@ -13,7 +13,7 @@ from .models import Note
 
 
 def get_project_note(project, note_pk):
-    return get_object_or_404(local_project_relations(Note.objects.all()), pk=note_pk, project=project)
+    return get_object_or_404(local_project_relations(Note.objects.filter(project=project)), pk=note_pk)
 
 
 def filtered_notes(queryset, request):
@@ -34,7 +34,7 @@ def create_initial_for_project(project, query):
     node_pk = query.get("node")
     character_pk = query.get("character")
     if node_pk:
-        node = ManuscriptNode.objects.filter(pk=node_pk, project=project).first()
+        node = ManuscriptNode.objects.filter(pk=node_pk, project=project).visible().first()
         if node:
             initial["node"] = node.pk
     if character_pk:

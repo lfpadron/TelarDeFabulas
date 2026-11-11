@@ -31,7 +31,7 @@ class NoteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if project is not None:
             self.instance.project = project
-            self.fields["node"].queryset = ManuscriptNode.objects.filter(project=project).order_by("parent_id", "position", "title")
+            self.fields["node"].queryset = ManuscriptNode.objects.filter(project=project).visible().order_by("parent_id", "position", "title")
             self.fields["character"].queryset = Character.objects.filter(project=project).order_by("name")
         else:
             self.fields["node"].queryset = ManuscriptNode.objects.none()

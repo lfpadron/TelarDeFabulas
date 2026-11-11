@@ -131,7 +131,7 @@ class ExportSnapshotTests(SecurityTestCase):
         original_id = self.scene.pk
         self.scene.delete()
         job.refresh_from_db()
-        self.assertIsNone(job.root_node_id)
+        self.assertEqual(job.root_node_id, original_id)
         document = get_export_document(job)
         self.assertEqual([node.node_id for node in document.nodes], [original_id])
         self.assertEqual(document.nodes[0].content, "DRAFT_ALPHA")

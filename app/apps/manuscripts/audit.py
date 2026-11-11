@@ -20,6 +20,7 @@ from apps.projects.models import Project
 
 from .models import ManuscriptNode
 from .hierarchy import ALLOWED_CHILD_TYPES, CURRENT_TYPES
+from .visibility import hidden_node_roots
 
 
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
@@ -65,7 +66,7 @@ def load_inventory():
                 "projects": list(Project.objects.order_by("pk").values("id", "user_id", "status")),
                 "nodes": list(ManuscriptNode.objects.order_by("pk").annotate(**annotations).values(
                     "id", "project_id", "parent_id", "node_type", "status", "position", "word_count",
-                    "is_publishable", *annotations,
+                    "is_publishable", "deleted_at", *annotations,
                 )),
                 "characters": list(Character.objects.order_by("pk").values("id", "project_id", "image", "importance")),
                 "notes": list(Note.objects.order_by("pk").values("id", "project_id", "node_id", "character_id", "status", "note_type")),
@@ -260,6 +261,7 @@ def analyze_inventory(data, storages):
             findings.add("PROJECT_REFERENCE_MISSING", "CRITICAL", "INVALID_DATA", "Registro apunta a proyecto inexistente.", model, missing)
 
     position_groups = defaultdict(list)
+    hidden = hidden_node_roots({**row, "deleted_at": row.get("deleted_at")} for row in nodes)
     for node in nodes:
         pk, parent_id, kind = node["id"], node["parent_id"], node["node_type"]
         parent = node_map.get(parent_id)
@@ -278,7 +280,7 @@ def analyze_inventory(data, storages):
         position = node["position"]
         if not isinstance(position, int) or isinstance(position, bool) or position < 1:
             node_finding("POSITION_INVALID", "HIGH", "INVALID_DATA", "Posicion nula, no entera o menor que uno.", [pk], True)
-        else:
+        elif pk not in hidden:
             position_groups[(node["project_id"], parent_id, position)].append(pk)
     duplicate_positions = [
         {"project_id": project, "parent_id": parent, "position": position, "node_ids": sorted(ids)}
@@ -360,6 +362,8 @@ def analyze_inventory(data, storages):
             "per_project": [{"project_id": row["id"], "books": book_counts[row["id"]], "nodes": node_counts[row["id"]]} for row in projects],
         },
         "manuscripts": {
+            "trash": {"direct": sum(row.get("deleted_at") is not None for row in nodes),
+                      "effectively_hidden": len(hidden), "visible": len(nodes) - len(hidden)},
             "total": len(nodes), "by_type": distribution(nodes, "node_type", ManuscriptNode.NodeType.values),
             "by_status": distribution(nodes, "status", ManuscriptNode.NodeStatus.values),
             "root_node_ids": [row["id"] for row in nodes if row["parent_id"] is None],

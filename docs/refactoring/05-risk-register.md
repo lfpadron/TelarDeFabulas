@@ -251,3 +251,37 @@ Texto duplicado en snapshots consume disco hasta su retencion; sigue pendiente
 medir cuotas por cuenta y operacion externa de respaldos. No hay ZIP, binarios
 incrustados, IA, mapas, grafos, OCR, pagos ni papelera general. Detalle en
 [18-world-exports-validation.md](18-world-exports-validation.md).
+
+## Actualizacion tras Prompt 14: F9
+
+| Riesgo | Estado actual | Evidencia y limite |
+| --- | --- | --- |
+| R12 / R34 | Mitigados para manuscritos, no para todas las entidades | Borrado logico de BOOK/PART/CHAPTER/SCENE; solo se marca el nodo directo. Restaurar ancestro no revive eliminaciones previas. Admin sin borrado individual/masivo; no se crean purgas literarias ni papelera general |
+| R03 / R06 / R07 | Permisos y jerarquia revalidados | Project -> nodo dentro de atomic, mismo propietario/proyecto, destino activo compatible, sin ciclos y posiciones visibles normalizadas. FROZEN/PENDING solo consultan; DELETED/ajenos 404. Nueve pruebas de concurrencia PostgreSQL |
+| R04 / R08 / R11 | Identidad y versiones conservadas | No cambia ninguna fila SceneVersion, su revision, sus fechas ni la definitiva vigente/borrador activo. WORK/FINAL/preview nuevos excluyen ocultos; los snapshots previos no se recapturan. Seis versiones y seis jobs reales comprobados |
+| R13 / R28 | Respaldo e integridad comprobados; migracion aditiva | Dump/media previos y huellas de 22 modelos conservados. 0005 agrega dos columnas e indice, sin cambiar IDs/textos/versiones; reversa bloqueada si hay tombstones. No se ensaya una restauracion nueva; respaldos externos/cifrados y ensayo recurrente pendientes |
+| R16 / R17 | Visibilidad por lotes, carga real pendiente | Recorrido iterativo de metadatos sin N+1 por nodo; listados sin texto de escena. Papelera pagina a 50 despues de materializar metadatos, y selectores cargan el proyecto. Medir memoria, latencia y contencion del lock con proyectos grandes |
+| R39 / P2 | Retencion conservadora puede crecer indefinidamente | No hay caducidad ni borrado definitivo de manuscritos. La limpieza de archivos exportados no toca fuentes literarias. Medir uso de PostgreSQL y definir politica comercial/legal por separado, con aprobacion explicita antes de purgar |
+| R40 / P2 | Futuros lectores/escritores deben respetar visibilidad | Manager base conserva todas las filas para integridad, historial y respaldos. Usar .visible() en lectura ordinaria y servicios con Project bloqueado para escribir. QuerySet.update/delete, bulk_* y SQL siguen siendo APIs privilegiadas, no rutas de negocio |
+| R41 / P2 | Ruta conservada, no historial independiente | La ubicacion se calcula desde FK originales conservadas; renombrar/mover un ancestro activo puede cambiar la ruta mostrada. Restaurar limpia el sello directo, sin mantener un registro separado de cada ciclo. Un padre ausente/oculto exige destino valido; estructura legacy invalida requiere revision, no reparacion automatica |
+
+Las posiciones retenidas por nodos ocultos pueden coincidir con posiciones del
+grupo visible renumerado. El auditor cuenta toda la papelera, pero comprueba
+duplicados solo entre hermanos visibles. La unicidad estructural sigue siendo
+cooperante; no se introduce una constraint SQL que confunda ambos conjuntos.
+
+La restauracion de manuscritos usa permiso EDIT, no la transicion RESTORE del
+proyecto: no habilita escrituras en proyectos congelados o pendientes de borrado.
+Notas, menciones y asociaciones ocultas permanecen vinculadas y reaparecen al
+restaurar. No se reasigna una definitiva ni se crean versiones por recuperar.
+
+El esquema debe conservarse si se retrocede el despliegue; codigo anterior a F9
+ignoraria los sellos y volveria a mostrar contenido oculto. Preferir correccion
+hacia delante, no una version antigua ni un dump previo sobre trabajo posterior.
+Prueba manual, resultados integrados, comandos e inventario en
+[19-manuscript-trash-validation.md](19-manuscript-trash-validation.md).
+
+1170 pruebas integradas aprobadas, 77 nuevas; check limpio, esquema al dia y
+Celery pong. QA real retirado con huellas originales/media identicas. Ninguna
+base ni volumen eliminados; no cambian maquinas anteriores ni archivos Git
+protegidos por el alcance (`subir_repo.bat` y `diff_*.txt`).

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{{ item.node.display_title }} | {% trans "Papelera" %}{% endblock %}
+{% block content %}
+{% project_permissions project as access %}
+<section class="scene-version manuscript-trash">
+    <h1>{{ item.node.display_title }}</h1>
+    <p><strong>{% trans "Identificador" %}:</strong> {{ item.node.pk }}</p>
+    <p><strong>{% trans "Tipo" %}:</strong> {{ item.node.get_node_type_display }}</p>
+    <p><strong>{% trans "Estado" %}:</strong> {% if item.direct %}{% trans "Eliminado" %}{% else %}{% trans "Oculto por ancestro" %}: {{ item.deleted_root.display_title }}{% endif %}</p>
+    <p><strong>{% trans "Ubicación original" %}:</strong> {{ item.location }}</p>
+    <p><strong>{% trans "Eliminado" %}:</strong> {{ item.deleted_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>{% trans "Descendientes afectados" %}:</strong> {{ item.affected_count }}</p>
+    <div class="actions">
+        <a class="button secondary" href="{% url 'manuscripts:trash' project.pk %}">{% trans "Volver a la papelera" %}</a>
+        {% if access.edit %}<a class="button" href="{% url 'manuscripts:trash_restore' project.pk item.node.pk %}">{% trans "Restaurar" %}</a>{% endif %}
+    </div>
+</section>
+{% endblock %}

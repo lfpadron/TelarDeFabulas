@@ -1,6 +1,6 @@
 # Roadmap de refactorizacion v01
 
-Fecha: 2026-11-09. Actualizado tras Prompt 13 (F8). Cada fase posterior requiere
+Fecha: 2026-11-11. Actualizado para Prompt 14 (F9). Cada fase posterior requiere
 una instruccion independiente de implementacion.
 No se estima duracion sin inventario de datos y presupuesto operativo. El orden
 protege identidad/texto antes de introducir nuevas reglas comerciales.
@@ -21,15 +21,16 @@ protege identidad/texto antes de introducir nuevas reglas comerciales.
 | F6.4: referencias (implementada) | Cinco tipos, adjuntos privados, asociaciones explicitas y limpieza durable | F6.1-F6.3; alcance aprobado en Prompt 11 | Un archivo reutilizado, cuota serializada, reemplazo tras commit y aislamiento por propietario/proyecto | 102 nuevas: archivos, SQL, permisos, UI/admin, diez carreras y migracion; suite integrada y evidencia en 16 |
 | F7: relaciones de personajes (implementada) | Quince tipos interpersonales, direccion explicita, reciprocidad opcional en una fila y CRUD desde ambas fichas | F6; alcance acotado aprobado en Prompt 12 | Sin duplicados exactos/inversos mutuos, sin cruces de proyecto; fichas/roles/menciones/afiliaciones conservados | 94 nuevas: 83 funcionales, diez carreras PostgreSQL, migracion aditiva; QA escritorio/movil y evidencia integrada en 17 |
 | F8: exportar entidades (implementada) | REFERENCE y doce alcances, con Markdown/DOCX/PDF, documento neutral y snapshot inmutable; sin binarios | F4/F6/F7; alcance aprobado en Prompt 13 | Fichas/catalogos/compendio fieles a la solicitud, historial y lifecycle compartidos, sin cruces ni manuscritos | 88 nuevas: 76 funcionales, 11 carreras y migracion; QA HTTP/Celery/desktop/movil/Word/PDF; detalle en 18 |
-| F9: trial y pago manual | Plan/Subscription/Payment, capacidades calculadas, transicion de cuentas heredadas y cupos configurables | F1/F5; D10-D14/D18-D19 | Trial con un proyecto y todas las funciones; vencido solo lectura/export; pagos manuales auditables | Reloj controlado, cupos concurrentes, cambio de plan y permisos en todas las apps |
-| F10: Stripe y retencion de cuenta | PaymentEvent, webhooks idempotentes, avisos por periodo, conservacion anual y purga auditable | F9; D11-D14/D17 | Pago confirmado mantiene acceso; no doble credito; renovacion cancela purga; avisos sin solapamiento | Firma, repeticion/orden de eventos, pago vs purga, ano bisiesto y ensayo de eliminacion en copia |
-| F11: capacidad y despliegue | Paginacion/carga progresiva, indices medidos, recursos de workers, observabilidad, TLS/static y restauracion | Medicion desde F0; integrar en cada fase | Presupuesto de latencia/RSS fijado y cumplido; check --deploy objetivo; operacion documentada | Datos representativos, EXPLAIN, carga web/export, caida de servicios y restauracion |
-| F12: retirada de compatibilidad | Evaluar retiro de columnas legacy/FRAGMENT y limpieza de copias | Todas las fases afectadas estables; aprobacion independiente | Sin lectores/escritores legacy, sin casos ambiguos ni datos sin destino; backup recuperable | Rehearsal completo forward/rollback, comprobacion de texto/relaciones y corte ensayado |
+| F9: papelera de manuscritos (implementada) | Eliminacion logica y recuperacion de libros/partes/capitulos/escenas, visibilidad efectiva y admin protegido | F1-F8; alcance aprobado en Prompt 14 | Mismos PK/versiones/vinculos; restaurar ancestro no reactiva eliminaciones anteriores; nuevos exports excluyen ocultos | 77 nuevas: 67 funcionales, nueve carreras PostgreSQL y migracion; suite completa y QA real; detalle en 19 |
+| F10: trial y pago manual (pospuesta) | Plan/Subscription/Payment, capacidades calculadas, transicion de cuentas heredadas y cupos configurables | F1/F5; D10-D14/D18-D19 | Trial con un proyecto y todas las funciones; vencido solo lectura/export; pagos manuales auditables | Reloj controlado, cupos concurrentes, cambio de plan y permisos en todas las apps |
+| F11: Stripe y retencion de cuenta | PaymentEvent, webhooks idempotentes, avisos por periodo, conservacion anual y purga auditable | F10; D11-D14/D17 | Pago confirmado mantiene acceso; no doble credito; renovacion cancela purga; avisos sin solapamiento | Firma, repeticion/orden de eventos, pago vs purga, ano bisiesto y ensayo de eliminacion en copia |
+| F12: capacidad y despliegue | Paginacion/carga progresiva, indices medidos, recursos de workers, observabilidad, TLS/static y restauracion | Medicion desde F0; integrar en cada fase | Presupuesto de latencia/RSS fijado y cumplido; check --deploy objetivo; operacion documentada | Datos representativos, EXPLAIN, carga web/export, caida de servicios y restauracion |
+| F13: retirada de compatibilidad | Evaluar retiro de columnas legacy/FRAGMENT y limpieza de copias | Todas las fases afectadas estables; aprobacion independiente | Sin lectores/escritores legacy, sin casos ambiguos ni datos sin destino; backup recuperable | Rehearsal completo forward/rollback, comprobacion de texto/relaciones y corte ensayado |
 
-F6-F7 y F9 pueden organizarse de forma independiente despues de sus dependencias,
+F6-F7 y F10 pueden organizarse de forma independiente despues de sus dependencias,
 pero no conviene mezclar jerarquia/versionado, billing y purga en una sola entrega.
-F11 es trabajo continuo: las optimizaciones necesarias por memoria no esperan al
-final si F0 revela manuscritos grandes. F12 es opcional y no habilita borrar datos
+F12 es trabajo continuo: las optimizaciones necesarias por memoria no esperan al
+final si F0 revela manuscritos grandes. F13 es opcional y no habilita borrar datos
 solo para simplificar el esquema.
 
 ## Contratos transversales
@@ -106,8 +107,11 @@ ni limpiar volumenes. No aceptar la destruccion de una base previa a ciegas.
 
 ## Recomendacion para el siguiente prompt
 
-Definir el alcance de **F9: trial y pago manual**: capacidades, cupos, fechas y
+Prompt 14 sustituye la anterior propuesta de F9 comercial por **papelera de
+manuscritos**. Trial/pago manual se pospone a F10: capacidades, cupos, fechas y
 transicion de cuentas existentes requieren aprobacion antes de implementar.
+Se recomienda consolidar respaldos restaurables y medir capacidad antes de
+produccion; no activar pagos ni purgas de fuentes en esta entrega.
 F8 ya exporta entidades y relaciones expresamente seleccionadas, sin adjuntos
 binarios ni manuscritos dentro del compendio. Los pagos no forman parte de F8.
 F6.1-F6.4 y F7 estan implementadas: geografia, residencia principal, organizaciones,
@@ -256,3 +260,28 @@ verificados. PDF de cinco paginas inspeccionado y DOCX de cinco paginas en Word.
 Datos temporales retirados; huellas originales y media identicas. Respaldo previo
 conservado, sin ensayo nuevo de restauracion ni borrado de bases/volumenes.
 Resultados, inventario y limites pendientes en el documento 18.
+
+## Cierre F9
+
+Prompt 14 agrega manuscripts.0005_manuscript_trash: deleted_at/deleted_by e
+indice, sin cambiar IDs, contenido, SceneVersion ni datos originales. No requiere
+deletion_batch_id: solo el nodo directo recibe sello; los descendientes heredan
+ocultamiento. Restaurar ancestro conserva eliminaciones independientes previas.
+Rescate aislado bajo padre valido del mismo proyecto, movimientos reutilizados,
+transaccion y lock Project -> nodo; orden visible normalizado. Admin sin borrado
+fisico individual/masivo y contenido oculto sin edicion ni nuevas versiones.
+
+Visibilidad efectiva por lotes para arbol, selectores, notas, menciones,
+referencias, WORK/FINAL y preview; snapshots historicos intactos. No se crean
+tareas de purga ni se extiende la papelera a otras entidades. FROZEN/PENDING solo
+consultan; restaurar contenido requiere EDIT, no cambia el estado del proyecto.
+
+Suite integrada: **1170 pruebas aprobadas**, 77 nuevas; 564.355 segundos en
+PostgreSQL. Check limpio, esquema al dia y Celery pong en Podman rootless.
+QA HTTP/navegador escritorio-movil: eliminar A, eliminar capitulo, restaurar
+capitulo recupera B sin A; recuperar A conserva seis versiones completas, sus
+borradores y definitivas. Seis jobs reales; WORK/FINAL antes y despues identicos.
+Solo QA retirado; huellas originales de 22 modelos y media iguales. Backups
+previos conservados, sin nuevo ensayo de restauracion ni borrado de bases/volumenes.
+Inventario, comandos, evidencia y riesgos en el documento 19. Se recomienda
+consolidar respaldos/capacidad antes de produccion; cobros siguen pospuestos.

@@ -146,6 +146,9 @@ class ReferenceAssociation(models.Model):
             if self.entity.project_id != self.reference.project_id:
                 raise ValidationError(_("La referencia y la entidad deben pertenecer al mismo proyecto."))
             validate_project_action(self.reference.project)
+        if self.manuscript_node_id:
+            from apps.manuscripts.visibility import require_visible_node
+            require_visible_node(self.manuscript_node)
 
     def save(self, *args, **kwargs):
         from .services import save_association

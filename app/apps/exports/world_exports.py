@@ -21,7 +21,7 @@ from apps.core.trees import build_tree_events, descendant_ids
 from apps.geography.models import GeographicLocation
 from apps.organizations.models import Organization, CharacterOrganizationMembership
 from apps.references.models import ReferenceMaterial, ReferenceAssociation, TARGETS
-from apps.references.selectors import local_associations
+from apps.references.selectors import local_associations, visible_associations
 from apps.references.validators import safe_original_filename, validate_source_url
 from apps.worldbuilding.models import WorldbuildingEntry
 
@@ -229,7 +229,7 @@ class WorldCapture:
         query = ReferenceAssociation.objects.filter(association_scope)
         fields = ("reference_id", "description", *[f"{key}_id" for key in TARGETS],
             "manuscript_node__title", "character__name", "geographic_location__name", "organization__name", "worldbuilding_entry__title")
-        self.associations = self.budget.read(checked(query, local_associations(query.filter(reference__project=self.project))).order_by("pk"), fields)
+        self.associations = self.budget.read(visible_associations(checked(query, local_associations(query.filter(reference__project=self.project), include_hidden=True))).order_by("pk"), fields)
         reference_ids.update(row["reference_id"] for row in self.associations)
         loaded = {row["id"] for row in self.selected["REFERENCE_MATERIAL"]}
         if reference_ids - loaded:
@@ -239,7 +239,7 @@ class WorldCapture:
         # Include all destinations of each captured reference, using metadata only.
         if reference_ids:
             query = ReferenceAssociation.objects.filter(reference_id__in=reference_ids)
-            self.associations = self.budget.read(checked(query, local_associations(query.filter(reference__project=self.project))).order_by("pk"), fields)
+            self.associations = self.budget.read(visible_associations(checked(query, local_associations(query.filter(reference__project=self.project), include_hidden=True))).order_by("pk"), fields)
         titles = {row["id"]: row["title"] for row in self.selected["REFERENCE_MATERIAL"]}
         for row in self.associations:
             target = next(key for key in TARGETS if row[f"{key}_id"] is not None)

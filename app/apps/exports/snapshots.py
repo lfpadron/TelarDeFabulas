@@ -123,7 +123,7 @@ def select_structure(project, root_node=None, *, mode="WORK"):
     if mode not in ("WORK", "FINAL"):
         raise ValidationError(_("Modalidad de exportación no válida."))
     # Only metadata: scene text is loaded in one separate, selected-version query.
-    nodes = list(ManuscriptNode.objects.filter(project=project).only(
+    nodes = list(ManuscriptNode.objects.filter(project=project).visible().only(
         "id", "project_id", "parent_id", "node_type", "title", "position", "created_at",
     ).order_by("position", "created_at", "pk")[:settings.EXPORT_SNAPSHOT_MAX_NODES + 1])
     if len(nodes) > settings.EXPORT_SNAPSHOT_MAX_NODES:

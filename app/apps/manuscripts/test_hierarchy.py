@@ -200,8 +200,9 @@ class HierarchyTests(SecurityTestCase):
     def test_delete_normalizes_remaining_siblings(self):
         pk = self.scene.pk
         self.scene.delete()
-        self.assertFalse(ManuscriptNode.objects.filter(pk=pk).exists())
-        self.assert_positions()
+        self.assertTrue(ManuscriptNode.objects.filter(pk=pk, deleted_at__isnull=False).exists())
+        positions = list(ManuscriptNode.objects.filter(parent=self.chapter).visible().order_by("position").values_list("position", flat=True))
+        self.assertEqual(positions, list(range(1, len(positions) + 1)))
 
     def test_move_rolls_back_both_groups_on_write_failure(self):
         from .services import _write_positions
@@ -392,7 +393,7 @@ class HierarchyTests(SecurityTestCase):
         response = self.client.get(self.url("manuscripts:tree"))
         rows = {row["node"].pk: row for row in response.context["tree_rows"]}
         self.assertFalse(rows[self.scene.pk]["can_create_child"])
-        self.assertFalse(rows[self.book.pk]["can_delete"])
+        self.assertTrue(rows[self.book.pk]["can_delete"])
         self.assertTrue(rows[self.chapter4.pk]["can_create_child"])
         self.assertTrue(rows[self.scene.pk]["can_delete"])
 

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n project_permissions %}
+{% block title %}{% trans "Papelera" %} | {{ project.name }}{% endblock %}
+{% block content %}
+{% project_permissions project as access %}
+<section class="scene-version manuscript-trash">
+    <h1>{% trans "Papelera" %}: {{ project.name }}</h1>
+    <div class="actions">
+        <a class="button secondary" href="{% url 'projects:detail' project.pk %}">{% trans "Volver al proyecto" %}</a>
+        <a class="button secondary" href="{% url 'manuscripts:tree' project.pk %}">{% trans "Manuscrito" %}</a>
+    </div>
+    {% if not access.edit %}<p class="warning-note">{% trans "Proyecto de solo lectura." %}</p>{% endif %}
+    {% if page.object_list %}
+    <div class="table-wrap">
+        <table class="trash-table">
+            <thead><tr><th>{% trans "Título" %}</th><th>{% trans "Tipo" %}</th><th>{% trans "Estado" %}</th><th>{% trans "Ubicación original" %}</th><th>{% trans "Eliminado" %}</th><th>{% trans "Descendientes afectados" %}</th><th>{% trans "Acciones" %}</th></tr></thead>
+            <tbody>{% for item in page %}<tr>
+                <td><a href="{% url 'manuscripts:trash_detail' project.pk item.node.pk %}">{{ item.node.display_title }}</a></td>
+                <td>{{ item.node.get_node_type_display }}</td>
+                <td>{% if item.direct %}{% trans "Eliminado" %}{% else %}{% trans "Oculto por ancestro" %}{% endif %}</td>
+                <td>{{ item.location }}</td>
+                <td>{{ item.deleted_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                <td>{{ item.affected_count }}</td>
+                <td>{% if access.edit %}<a href="{% url 'manuscripts:trash_restore' project.pk item.node.pk %}">{% trans "Restaurar" %}</a>{% endif %}</td>
+            </tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    <div class="actions">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">{% trans "Anterior" %}</a>{% endif %}
+        <span>{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}">{% trans "Siguiente" %}</a>{% endif %}
+    </div>
+    {% else %}<p>{% trans "La papelera está vacía." %}</p>{% endif %}
+</section>
+{% endblock %}

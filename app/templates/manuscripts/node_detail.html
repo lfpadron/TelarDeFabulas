@@ -98,7 +98,7 @@
                 </form>
             {% endif %}
             <a class="button" href="{% url 'notes:create' project.pk %}?node={{ node.pk }}">{% trans "Crear nota" %}</a>
-            {% if node_access.can_delete %}<a class="button warning" href="{% url 'manuscripts:delete' project.pk node.pk %}">{% trans "Borrar" %}</a>{% endif %}
+            {% if node_access.can_delete %}<a class="button warning" href="{% url 'manuscripts:delete' project.pk node.pk %}">{% trans "Enviar a papelera" %}</a>{% endif %}
         {% endif %}
     </div>
 </section>
